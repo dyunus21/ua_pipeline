@@ -239,12 +239,12 @@ def run():
 
     ###RUN ALL FILES IN BUCKET AND OUTPUT INTO CSV IN FORM + TABLE FORMAT
     s3 = boto3.resource('s3')
-    my_bucket = s3.Bucket('demovaccinecards2022')
-    form_df = {}
-    df = {}
-    corrected_df={}
+    my_bucket = s3.Bucket('demovaccinecards2022') #REPLACE WITH S3 BUCKET NAME
+    form_df = {} #FORM EXTRACTION
+    df = {} #TABLE_EXTRACTION
+    corrected_df={} #AUTOCORRECTED TABLE EXTRACTION
     for my_bucket_object in my_bucket.objects.all():
-        if (my_bucket_object.key != 'IMG_8541.jpg'):
+        if (my_bucket_object.key != 'IMG_8541.jpg'):  #THIS IMAGE DOES NOT WORK RIGHT NOW
             print(my_bucket_object.key)
             form_df[my_bucket_object.key] = runFormAnalyzeTextract(s3BucketVaccineCards,  my_bucket_object.key)
             form_df[my_bucket_object.key] = form_df[my_bucket_object.key][form_df[my_bucket_object.key]['key_text'].str.contains('First Name|Last Name|Date of birth')]
@@ -255,7 +255,7 @@ def run():
     print(form_df)
     print(df)
 
-    with open('form_output.csv','w+') as f:
+    with open('output.csv','w+') as f:
         for i in df:
             f.write("\n")
             f.write(i + "\n")
@@ -268,7 +268,7 @@ def run():
 
     print(corrected_df)
 
-    with open('corrected_form_output.csv','w+') as f:
+    with open('corrected_output.csv','w+') as f:
         for i in corrected_df:
             f.write("\n")
             f.write(i + "\n")
@@ -278,12 +278,11 @@ def run():
             f.write("\n")
 
     #### prints all files in s3
-    s3 = boto3.resource('s3')
-    my_bucket = s3.Bucket('demovaccinecards2022')
-    for my_bucket_object in my_bucket.objects.all():
-        print(my_bucket_object.key)
+#     s3 = boto3.resource('s3')
+#     my_bucket = s3.Bucket('demovaccinecards2022')
+#     for my_bucket_object in my_bucket.objects.all():
+#         print(my_bucket_object.key)
 
-    corrected_df.to_csv('sample2.csv')
 
 
    
