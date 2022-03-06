@@ -1,3 +1,4 @@
+from doctest import DocFileCase
 from enum import auto
 import boto3
 import time
@@ -271,35 +272,21 @@ def create_final_df(vaccine_card):
     final_df = final_df.fillna(method='bfill')
     final_df = final_df[:-1]
     pd.set_option("display.max_rows", None, "display.max_columns", None)
-    print(final_df)
+    # print(final_df)
     return final_df
 
 def run():
-    df = create_final_df(vaccineCardFile)
-  
-    print(df)
+    s3 = boto3.resource('s3')
+    my_bucket = s3.Bucket("demovaccinecards2022")
 
+    final_df  = pd.DataFrame()
+    for my_bucket_object in my_bucket.objects.all():
+        if (my_bucket_object.key != 'IMG_8541.jpg' and my_bucket_object.key != 'IMG_5027.jpeg'):
+            final_df= final_df.append(create_final_df(my_bucket_object.key),ignore_index=True)
 
-    # s3 = boto3.resource('s3')
-    # my_bucket = s3.Bucket("demovaccinecards2022")
-    # df = {}
-    # corrected_df={}
-    # final_df ={}
-    # for my_bucket_object in my_bucket.objects.all():
-    #     if (my_bucket_object.key != 'IMG_8541.jpg' and my_bucket_object.key != 'IMG_5027.jpeg'):
-    #         final_df[my_bucket_object.key] = create_final_df(my_bucket_object.key)
-    #     # df[my_bucket_object.key] = runTableAnalyzeTextract(s3BucketVaccineCards, my_bucket_object.key)
-    #     # corrected_df[my_bucket_object.key] = correct_all_table(df[my_bucket_object.key])
-    # pd.set_option("display.max_rows", None, "display.max_columns", None)
-    # #print(df)
-    # #print(corrected_df)
-    # with open('final_output.csv','w+') as f:
-    #     for i in final_df:
-    #         f.write("\n")
-    #         f.write(i)
-    #         f.write("\n")
-    #         final_df[i].to_csv(f,index = False)
-    #         f.write("\n")
+    pd.set_option("display.max_rows", None, "display.max_columns", None)
+    final_df.to_csv("final_output.csv",index = False)
+
 
 
 
