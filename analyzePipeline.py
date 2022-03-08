@@ -1,3 +1,4 @@
+from doctest import DocFileCase
 from enum import auto
 import boto3
 import time
@@ -63,6 +64,8 @@ def get_textract_tables(job_id):
     response = textract.get_document_analysis(JobId=job_id)
     doc = Document(response)
 
+
+    #first name, last name, dob, dose1manufacture, dose1date, dose1location,dose2manufacturer
     # FIX LATER 
     for page in doc.pages:
         for table in page.tables:
@@ -225,64 +228,159 @@ def correct_all_table(df):
     return df
 
 
+def create_final_df(vaccine_card):
+    form_df = runFormAnalyzeTextract(s3BucketVaccineCards, vaccine_card)
+    form_df.set_index('key_text', inplace=True)
+    #print(form_df)
+    fields = ['First Name','Last Name','Date of birth']
+    f_df = pd.DataFrame()
+    for i in fields:
+        if i in form_df.index:
+            f_df[i] = form_df.loc[i]
+        else:
+            f_df[i] = 'N/A'
+
+    table_df = runTableAnalyzeTextract(s3BucketVaccineCards, vaccine_card)
+    corrected_df = correct_all_table(table_df)
+    new_header = corrected_df.iloc[0] #grab the first row for the header
+    corrected_df = corrected_df[1:] #take the data less the header row
+    corrected_df.columns = new_header #set the header row as the df header
+
+    #created separate dfs for the doses because they need to have different column names in the final df
+    dose1_df = pd.DataFrame()
+    dose2_df = pd.DataFrame()
+    # print(corrected_df.get('Vaccine Header'))
+    if 'Vaccine Header' in corrected_df.columns:
+        dose1_df = corrected_df.loc[corrected_df['Vaccine Header'] == 'dose1']
+        dose1_df = dose1_df.drop("Vaccine Header", axis=1)
+        dose2_df = corrected_df.loc[corrected_df['Vaccine Header'] == 'dose2']
+        dose2_df = dose2_df.drop("Vaccine Header", axis=1)
+    else:
+        dose1_df = dose1_df.iloc[1:]
+        dose1_df = dose1_df.iloc[2:]
+
+    dose1_df = dose1_df.rename(columns={'Manufacturer Header': 'dose1_manufacturer', 'Date Header': 'dose1_date', 'Site Header': 'dose1_location' })
+    dose2_df = dose2_df.rename(columns={'Manufacturer Header': 'dose2_manufacturer', 'Date Header': 'dose2_date', 'Site Header': 'dose2_location' })
+    frames = [dose1_df, dose2_df]
+    t_df = pd.concat(frames)
+    t_df = t_df.fillna(method='bfill')
+    t_df = t_df[:-1]
+
+    #final_df contains form AND table dfs
+    final_frames = [f_df, t_df]
+    final_df = pd.concat(final_frames)
+    final_df = final_df.fillna(method='bfill')
+    final_df = final_df[:-1]
+    pd.set_option("display.max_rows", None, "display.max_columns", None)
+    # print(final_df)
+    return final_df
+
 def run():
-    
+    s3 = boto3.resource('s3')
+    my_bucket = s3.Bucket("demovaccinecards2022")
+
+    final_df  = pd.DataFrame()
+    for my_bucket_object in my_bucket.objects.all():
+        if (my_bucket_object.key != 'IMG_8541.jpg' and my_bucket_object.key != 'IMG_5027.jpeg'):
+            final_df= final_df.append(create_final_df(my_bucket_object.key),ignore_index=True)
+
+    pd.set_option("display.max_rows", None, "display.max_columns", None)
+    final_df.to_csv("final_output.csv",index = False)
+
+
+
+
    ### ANALYZE SINGLE VACCINE CARD
     # form_df = runFormAnalyzeTextract(s3BucketVaccineCards, vaccineCardFile)
-    # # print(df)
-    # form_df = form_df[form_df['key_text'].str.contains('First Name|Last Name|Date of birth')]
 
-    # table_df =  runTableAnalyzeTextract(s3BucketVaccineCards, vaccineCardFile)
+    # form_df.set_index('key_text', inplace=True)
     # print(form_df)
+    # fields = ['First Name','Last Name','Date of birth']
+    # df = pd.DataFrame()
+    # for i in fields:
+    #     df[i] = form_df.loc[i]
+    # print(df)
+ 
+    # table_df = runTableAnalyzeTextract(s3BucketVaccineCards, vaccineCardFile)
+    # corrected_df = correct_all_table(table_df)
     # print(table_df)
+    # print(corrected_df)
+
+    # field = ['dose1','dose2']
+    # t_df = pd.DataFrame()
+    # # corrected_df = corrected_df.iloc[1: , :]
+    # # corrected_df.columns = corrected_df.iloc[0]
+    # corrected_df.reset_index()
+    # corrected_df.set_index(0, inplace=True)
+
+    # # for col in corrected_df.columns:
+    # #     print(col)
+    # corrected_df = corrected_df.iloc[1: , :]
+    # for i in field:
+        
+    #     temp = corrected_df.loc[i]
+    #     # print(type(temp))
+    #     # temp.resetIndex()
+    #     print(temp)
+    #     ind = 1
+    #     t_df[ind] =i
+    #     for j in temp:
+    #     # print(type(temp[0]))
+    #         t_df[ind] = j
+    #         print(j)
+    #         ind+=1
+    
+    # print(t_df)
+    # # print(finaldf)
     
 
     ###RUN ALL FILES IN BUCKET AND OUTPUT INTO CSV IN FORM + TABLE FORMAT
-    s3 = boto3.resource('s3')
-    my_bucket = s3.Bucket('demovaccinecards2022') #REPLACE WITH S3 BUCKET NAME
-    form_df = {} #FORM EXTRACTION
-    df = {} #TABLE_EXTRACTION
-    corrected_df={} #AUTOCORRECTED TABLE EXTRACTION
-    for my_bucket_object in my_bucket.objects.all():
-        if (my_bucket_object.key != 'IMG_8541.jpg'):  #THIS IMAGE DOES NOT WORK RIGHT NOW
-            print(my_bucket_object.key)
-            form_df[my_bucket_object.key] = runFormAnalyzeTextract(s3BucketVaccineCards,  my_bucket_object.key)
-            form_df[my_bucket_object.key] = form_df[my_bucket_object.key][form_df[my_bucket_object.key]['key_text'].str.contains('First Name|Last Name|Date of birth')]
-            df[my_bucket_object.key] = runTableAnalyzeTextract(s3BucketVaccineCards, my_bucket_object.key)
-            corrected_df[my_bucket_object.key] = correct_all_table(df[my_bucket_object.key])
+    # s3 = boto3.resource('s3')
+    # my_bucket = s3.Bucket('demovaccinecards2022')
+    # form_df = {}
+    # df = {}
+    # corrected_df={}
+    # for my_bucket_object in my_bucket.objects.all():
+    #     if (my_bucket_object.key != 'IMG_8541.jpg'):
+    #         print(my_bucket_object.key)
+    #         form_df[my_bucket_object.key] = runFormAnalyzeTextract(s3BucketVaccineCards,  my_bucket_object.key)
+    #         form_df[my_bucket_object.key] = form_df[my_bucket_object.key][form_df[my_bucket_object.key]['key_text'].str.contains('First Name|Last Name|Date of birth')]
+    #         df[my_bucket_object.key] = runTableAnalyzeTextract(s3BucketVaccineCards, my_bucket_object.key)
+    #         corrected_df[my_bucket_object.key] = correct_all_table(df[my_bucket_object.key])
 
-    pd.set_option("display.max_rows", None, "display.max_columns", None) #Added to print entire dataframe
-    print(form_df)
-    print(df)
+    # pd.set_option("display.max_rows", None, "display.max_columns", None) #Added to print entire dataframe
+    # print(form_df)
+    # print(df)
 
-    with open('output.csv','w+') as f:
-        for i in df:
-            f.write("\n")
-            f.write(i + "\n")
-            form_df[i].to_csv(f,header = False, index = False)
-            f.write("\n")
-            df[i].to_csv(f,index = False)
-            f.write("\n")
+    # with open('form_output.csv','w+') as f:
+    #     for i in df:
+    #         f.write("\n")
+    #         f.write(i + "\n")
+    #         form_df[i].to_csv(f,header = False, index = False)
+    #         f.write("\n")
+    #         df[i].to_csv(f,index = False)
+    #         f.write("\n")
     
-    print("Auto-Corrected table")
+    # print("Auto-Corrected table")
 
-    print(corrected_df)
+    # print(corrected_df)
 
-    with open('corrected_output.csv','w+') as f:
-        for i in corrected_df:
-            f.write("\n")
-            f.write(i + "\n")
-            form_df[i].to_csv(f,header = False, index = False)
-            f.write("\n")
-            corrected_df[i].to_csv(f,index = False)
-            f.write("\n")
+    # with open('corrected_form_output.csv','w+') as f:
+    #     for i in corrected_df:
+    #         f.write("\n")
+    #         f.write(i + "\n")
+    #         form_df[i].to_csv(f,header = False, index = False)
+    #         f.write("\n")
+    #         corrected_df[i].to_csv(f,index = False)
+    #         f.write("\n")
 
-    #### prints all files in s3
-#     s3 = boto3.resource('s3')
-#     my_bucket = s3.Bucket('demovaccinecards2022')
-#     for my_bucket_object in my_bucket.objects.all():
-#         print(my_bucket_object.key)
+    # #### prints all files in s3
+    # s3 = boto3.resource('s3')
+    # my_bucket = s3.Bucket('demovaccinecards2022')
+    # for my_bucket_object in my_bucket.objects.all():
+    #     print(my_bucket_object.key)
 
+    # corrected_df.to_csv('sample2.csv')
 
 
    
