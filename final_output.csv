@@ -1,18 +1,19 @@
-First Name,Last Name,Date of birth,dose1_manufacturer,dose1_date,dose1_location,dose2_manufacturer,dose2_date,dose2_location
-Leah,Courtney,11/08/2000 IIS record,vaccine$ moderna,yy ,,044AZIA MODERNA ,MARmit 19 2.2021 ,JBricker RN 
-Diya,Yunus,6/27/03,vaccine$ pfizer,4/2/21,Sateway 6302281H AVE NE ,7/31/21,4/23/21,vaccine$ pfizer
-Shloaka,Denvir,3/13/03,vaccine$ pfizer,33121,,,/ / ,
-ILana,KaveN,2/18/03,dose2,3/17/21,Watyro 1033 ,vaccine$ moderna,4/14/21,walgreens
-Joshmita,Chintala,(31/2001,vaccine$ pfizer,3/2421 mm dd yy ,walgreens,vaccine$ pfizer,4/2121 mm dd yy ,walgreens
-Kriti,vacunas Mathur,11/2/03,dose1,3/6/21,Vaccine Header,COVID19 ,de ,
-,,08/26/,vaccine$ pfizer,03/01 121 mm dd yy ,walgreens,vaccine$ pfizer,3/23/21,walgreens
-,,5/13/01,Moderna 006 M20A ,2/13/21,walgreens,dose2,3/13/21,walgreens
-,of 1/22/ birth,N/A,Moderna 026 B2IA ,4/12/21,walgreens,dose1,5/10/21,DAPeHealth 
-,,7/19/,MODERNA 017B21A ,dose1,VCHD ,Modema 037B21A ,dose1,VCHO 696annel 
-749,41171,N/A,vaccine$ pfizer,3/12/21,,vaccine$ pfizer,4/2/21,
-KELSI,PADA LIA,N/A,vaccine$ pfizer,04/32/21,WIHD ,vaccine$ pfizer,5/5/21,WCHD 
-Shivani,Agrawal,2/13/01,vaccine$ pfizer,7/24/21,as 3938 ,vaccine$ pfizer,8/13/21,CUS 
-RIYA,GYA NMOTE,1-29 2001,vaccine$ pfizer,51844,WAL ,,4/15/21,WAL 
-Uditha,vell dandla,5/8/02,PFIZER COVID-19 LOT# ER8730 ,4/1/21,# 1197 ,7/31/21,,
-Yatri,Sutaria,10/11/02,vaccine$ moderna,4/6/21,,moderna 006C21A ,5/3/21,CIVC 
-,SANTHANAM JESSICA First Name Mi,N/A,vaccine$ pfizer,4/10/21,PHCS ,vaccine$ pfizer,5/8/21,PHCS 
+First Name,Last Name,Date of birth,Vaccine Header,dose1_manufacturer,dose1_date,dose1_location,dose2_manufacturer,dose2_date,dose2_location
+Leah,Courtney,11/08/2000 IIS record,dose1,vaccine$ moderna,yy ,,044AZIA MODERNA ,MARmit 19 2.2021 ,JBricker RN 
+Diya,Yunus,6-27-2003,dose1,vaccine$ pfizer,4/2/21,Sateway 6302281H AVE NE ,07/31/21,4 / 23 / 21 ,vaccine$ pfizer
+Shloaka,Denvir,3/13/2003,dose1,vaccine$ pfizer,33121 ,,,/ / ,
+ILana,KaveN,02/18/03,dose1,dose2,03/17/21,Watyro 1033 ,vaccine$ moderna,4/14/21,walgreens
+Joshmita,Chintala,(31/2001,dose1,vaccine$ pfizer,3/2421 mm dd yy ,walgreens,vaccine$ pfizer,4/2121 mm dd yy ,walgreens
+Anagha,shenoy,10/12/03,,vaccine$ pfizer,APR 2 0_2021 mm dd yy ,walgreens,vaccine$ pfizer,5/11/21,walgreens
+Kriti,vacunas Mathur,11/02/2003,dose1,dose1,3/6/21,Vaccine Header,COVID19 ,de ,
+,,08/26/,dose1,vaccine$ pfizer,03/01 121 mm dd yy ,walgreens,vaccine$ pfizer,03/23/21,walgreens
+,,5/13/1,dose1,Moderna 006 M20A ,2/13/21,walgreens,dose2,3/13/21,walgreens
+,of 1/22/ birth,N/A,dose1,Moderna 026 B2IA ,4/12/21,walgreens,dose1,5 /10/21 ,DAPeHealth 
+,,7/19/,dose1,MODERNA 017B21A ,dose1,VCHD ,Modema 037B21A ,dose1,VCHO 696annel 
+00749,41171,N/A,dose1,vaccine$ pfizer,03/12/21,,vaccine$ pfizer,04/02/21,
+KELSI,PADA LIA,N/A,dose1,vaccine$ pfizer,04/32/21,WIHD ,vaccine$ pfizer,05/05/21,WCHD 
+Shivani,Agrawal,2-13-2001,dose1,vaccine$ pfizer,7/24/21,as 3938 ,vaccine$ pfizer,8/13/21,CUS 
+RIYA,GYA NMOTE,1-29 2001,dose1,vaccine$ pfizer,51844 ,WAL ,,4/15/21,WAL 
+Uditha,vell dandla,5/8/02,dose1,PFIZER COVID-19 LOT# ER8730 ,04/01/2021,# 1197 ,07/31/2021,,
+Yatri,Sutaria,10-11-2002,dose1,vaccine$ moderna,4/6/21,,moderna 006C21A ,5/3/21,CIVC 
+,SANTHANAM JESSICA First Name Mi,N/A,dose1,vaccine$ pfizer,4/10/21,PHCS ,vaccine$ pfizer,05/08/21,PHCS 

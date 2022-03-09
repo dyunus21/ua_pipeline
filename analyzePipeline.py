@@ -235,10 +235,10 @@ def create_final_df(vaccine_card):
     fields = ['First Name','Last Name','Date of birth']
     f_df = pd.DataFrame()
     for i in fields:
-        if i in form_df.index:
-            f_df[i] = form_df.loc[i]
+        if (form_df.empty) or (i not in form_df.index):
+            f_df[i] = "N/A"
         else:
-            f_df[i] = 'N/A'
+            f_df[i] = form_df.loc[i]
 
     table_df = runTableAnalyzeTextract(s3BucketVaccineCards, vaccine_card)
     corrected_df = correct_all_table(table_df)
@@ -252,15 +252,15 @@ def create_final_df(vaccine_card):
     # print(corrected_df.get('Vaccine Header'))
     if 'Vaccine Header' in corrected_df.columns:
         dose1_df = corrected_df.loc[corrected_df['Vaccine Header'] == 'dose1']
-        dose1_df = dose1_df.drop("Vaccine Header", axis=1)
         dose2_df = corrected_df.loc[corrected_df['Vaccine Header'] == 'dose2']
-        dose2_df = dose2_df.drop("Vaccine Header", axis=1)
+        
     else:
-        dose1_df = dose1_df.iloc[1:]
-        dose1_df = dose1_df.iloc[2:]
-
+        # print(corrected_df.iloc[0])
+        dose1_df = dose1_df.append(corrected_df.iloc[0])
+        dose2_df = dose2_df.append(corrected_df.iloc[1])
     dose1_df = dose1_df.rename(columns={'Manufacturer Header': 'dose1_manufacturer', 'Date Header': 'dose1_date', 'Site Header': 'dose1_location' })
     dose2_df = dose2_df.rename(columns={'Manufacturer Header': 'dose2_manufacturer', 'Date Header': 'dose2_date', 'Site Header': 'dose2_location' })
+    
     frames = [dose1_df, dose2_df]
     t_df = pd.concat(frames)
     t_df = t_df.fillna(method='bfill')
@@ -276,12 +276,16 @@ def create_final_df(vaccine_card):
     return final_df
 
 def run():
+    # final_df = create_final_df("IMG_8541.jpg")
+    # # final_df = create_final_df(vaccineCardFile)
+    # print(final_df)
+
     s3 = boto3.resource('s3')
     my_bucket = s3.Bucket("demovaccinecards2022")
 
     final_df  = pd.DataFrame()
     for my_bucket_object in my_bucket.objects.all():
-        if (my_bucket_object.key != 'IMG_8541.jpg' and my_bucket_object.key != 'IMG_5027.jpeg'):
+        if (my_bucket_object.key != 'IMG_8541.jpg'):
             final_df= final_df.append(create_final_df(my_bucket_object.key),ignore_index=True)
 
     pd.set_option("display.max_rows", None, "display.max_columns", None)
