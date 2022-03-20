@@ -16,8 +16,8 @@ from nltk.util import ngrams
 s3 = boto3.client("s3")
 textract = boto3.client("textract")
 
-s3BucketVaccineCards = "demovaccinecardsjh"  # REPLACE WITH S3 BUCKET NAME
-vaccineCardFile = "vaccine card JH.JPG"             # REPLACE FOR CARD IN BUCKET
+s3BucketVaccineCards = "demovaccinecards2022"  # REPLACE WITH S3 BUCKET NAME
+vaccineCardFile = "Covid_Vaccine_Card.jpg"             # REPLACE FOR CARD IN BUCKET
 
 def start_analyze(s3BucketVaccineCards, vaccineCardFile, feature_type):
     doc_spec = {"S3Object": {"Bucket": s3BucketVaccineCards, "Name": vaccineCardFile}}
@@ -227,26 +227,6 @@ def correct_all_table(df):
     #df.to_csv('sample2.csv')
     return df
 
-def get_doses_as_string(corrected_df):
-    dose1_df = corrected_df[corrected_df[0].str.contains('dose1')]
-    dose1_list = dose1_df.astype(str).values.flatten().tolist()
-    if len(dose1_list) > 0:
-        dose1_list.pop(0) #removes 'dose1' element from list
-
-    dose2_df = corrected_df[corrected_df[0].str.contains('dose2')]
-    dose2_list = dose2_df.astype(str).values.flatten().tolist()
-    if len(dose2_list) > 0:
-        dose2_list.pop(0) #removes 'dose2' element from list
-
-    #print(dose2_list)
-    dose1_list.extend(dose2_list)
-    doses_list = dose1_list #combining this line with the line above it doesn't work somehow
-    dose_info = "" #comma separated string of dose 1 and 2 info ONLY
-    for i in range(len(doses_list)):
-        dose_info += doses_list[i] + ","
-    dose_info = dose_info[0:len(dose_info)-1]
-    return dose_info
-
 def create_final_df(vaccine_card):
     form_df = runFormAnalyzeTextract(s3BucketVaccineCards, vaccine_card)
     form_df.set_index('key_text', inplace=True)
@@ -292,25 +272,15 @@ def create_final_df(vaccine_card):
     final_df = final_df[:-1]
     final_df = final_df.replace('', "N/A")
     final_df = final_df.replace(np.nan, "N/A")
+    if "N/A" in final_df.values:
+        final_df["Flag"] = True
+    else:
+        final_df["Flag"] = False
     pd.set_option("display.max_rows", None, "display.max_columns", None)
     # print(final_df)
     return final_df
 
 def run():
-    #df = runTableAnalyzeTextract()
-    #df.head()
-    #FORM STUFF
-    # df = df[df['key_text'].str.contains('Last Name')]
-    # print(df['value_text'])
-    #print(df)
-    #END FORM STUFF
-    # print(t_df)
-    # print()
-    # df = create_final_df("RedacteUSAvax4.png")
-    # pd.set_option("display.max_rows", None, "display.max_columns", None)
-    # print(df)
-    # print(df['dose1_location'].values)
-    
     s3 = boto3.resource('s3')
     my_bucket = s3.Bucket(s3BucketVaccineCards)
 
@@ -321,71 +291,6 @@ def run():
 
     pd.set_option("display.max_rows", None, "display.max_columns", None)
     final_df.to_csv("final_output.csv",index = False)
-
-    
-
-    # s3 = boto3.resource('s3')
-    # my_bucket = s3.Bucket(s3BucketVaccineCards)
-
-    # final_df  = pd.DataFrame()
-    # for my_bucket_object in my_bucket.objects.all():
-    #     if (my_bucket_object.key != 'IMG_8541.jpg' and my_bucket_object.key != 'IMG_5027.jpeg'):
-    #         final_df= final_df.append(create_final_df(my_bucket_object.key),ignore_index=True)
-
-    # pd.set_option("display.max_rows", None, "display.max_columns", None)
-    # final_df.to_csv("final_output.csv",index = False)
-    
-
-    # df = runTableAnalyzeTextract(s3BucketVaccineCards, vaccineCardFile)
-    # corrected_df = correct_all_table(df)
-    # print(get_doses_as_string(corrected_df))
-    #df = df[df['key_text'].str.contains('Last Name')]
-    #df = pd.read_csv('sample.csv')
-    #print(df)
-    
-    #corrected_df = pd.read_csv('sample2.csv')
-    
-    #print(dose1_df)
-
-    #corrected_df.to_csv('sample2.csv')
-    # s3 = boto3.resource('s3')
-    # my_bucket = s3.Bucket("demovaccinecardsjh")
-    # df = {}
-    # corrected_df={}
-    # for my_bucket_object in my_bucket.objects.all():
-    #     df[my_bucket_object.key] = runTableAnalyzeTextract(s3BucketVaccineCards, my_bucket_object.key)
-    #     corrected_df[my_bucket_object.key] = correct_all_table(df[my_bucket_object.key])
-    # pd.set_option("display.max_rows", None, "display.max_columns", None) 
-    # #print(df)
-    # #print(corrected_df)
-    # with open('doses_output.csv','w+') as f:
-    #     for i in corrected_df:
-    #         f.write("\n")
-    #         f.write(i)
-    #         f.write("\n")
-    #         f.write(get_doses_as_string(corrected_df[i]))
-    #         #corrected_df[i].to_csv(f,index = False)
-    #         f.write("\n")
-    #stores as csv
-    # with open('output.csv','w+') as f:
-    #     for i in df:
-    #         f.write("\n")
-    #         f.write(i)
-    #         df[i].to_csv(f,index = False)
-    #         f.write("\n")
-    
-    #print("Auto-Corrected table")
-    # corrected_df = correct_all_table(df)
-    # # corrected_df = pd.read_csv('sample2.csv')
-    # corrected_df.to_csv("corrected_tables.csv", index = False)
-    # print(corrected_df)
-    # with open('corrected_output.csv','w+') as f:
-    #     for i in corrected_df:
-    #         f.write("\n")
-    #         f.write(i)
-    #         corrected_df[i].to_csv(f,index = False)
-    #         f.write("\n")
-    
     
 
 run()
