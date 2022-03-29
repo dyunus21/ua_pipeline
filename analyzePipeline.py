@@ -217,8 +217,8 @@ def correct_all_table(df):
     correct_words = {'pfizer':'vaccine$ pfizer', 'pfizer xxxxxx':'vaccine$ pfizer', 'pfizer-biontech': 'vaccine$ pfizer', 
         'moderna':'vaccine$ moderna', '1st dose':'dose1', '1st dose covid-19': 'dose1', '2nd Dose': 'dose2', 
         '2nd dose covid-19': 'dose2', 'walgreens': 'walgreens', 'date': 'Date Header',
-        'product name/manufacturer lot number': 'Manufacturer Header', 'vaccine': 'Vaccine Header',
-        'healthcare professional or clinic site': 'Site Header', 'other': 'none', 'mm dd yy': 'none'}
+        'product name/manufacturer lot number': 'Manufacturer Header','lot number': 'Manufacturer Header', 'vaccine': 'Vaccine Header',
+        'healthcare professional or clinic site': 'Site Header','or clinic site': 'Site Header', 'other': 'none', 'mm dd yy': 'none'}
 
     #print(df)
     for row in range(df.shape[0]):
@@ -281,23 +281,26 @@ def create_final_df(vaccine_card):
     #final_df contains form AND table dfs
     final_frames = [f_df, t_df]
     final_df = pd.concat(final_frames)
+    print(final_df)
     final_df = final_df.fillna(method='bfill')
     final_df = final_df[:-1]
-    final_df = final_df.replace('', "N/A")
     final_df = final_df.replace(np.nan, "N/A")
-
-    # Flags vaccine card (True) if Vaccine card extraction contains any N/A values
-    if "N/A" in final_df.values:
-        final_df["Flag"] = True
-    else:
-        final_df["Flag"] = False
-
+    final_df = final_df.replace('', "N/A")
 
     # Removes any unnecessary columns
     columns_required = ["First Name","Last Name", "Date of birth","dose1_date","dose1_manufacturer","dose1_location","dose2_date","dose2_manufacturer","dose2_location","Flag"]
     for col in final_df.columns:
         if col not in columns_required:
             final_df.drop(col,inplace = True, axis = 1)
+    
+    
+    
+     # Flags vaccine card (True) if Vaccine card extraction contains any N/A values
+    if "N/A" in final_df.values:
+        final_df["Flag"] = True
+    else:
+        final_df["Flag"] = False
+
 
     pd.set_option("display.max_rows", None, "display.max_columns", None)
     print(final_df)
@@ -305,7 +308,7 @@ def create_final_df(vaccine_card):
 
 def run():
     # Run your vaccine card
-    # final_df = create_final_df(vaccineCardFile)
+    # final_df = create_final_df("FullSizeRender.jpeg")
 
     # Run entire bucket of vaccine cards
     s3 = boto3.resource('s3')
