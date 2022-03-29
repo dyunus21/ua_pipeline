@@ -16,8 +16,8 @@ from nltk.util import ngrams
 s3 = boto3.client("s3")
 textract = boto3.client("textract")
 
-s3BucketVaccineCards = "demovaccinecardsjh"  # REPLACE WITH S3 BUCKET NAME
-vaccineCardFile = "vaccine card JH.JPG"             # REPLACE FOR CARD IN BUCKET
+s3BucketVaccineCards = "demovaccinecards123"  # REPLACE WITH S3 BUCKET NAME
+vaccineCardFile = "IMG_5027 (1).jpeg"             # REPLACE FOR CARD IN BUCKET
 
 def start_analyze(s3BucketVaccineCards, vaccineCardFile, feature_type):
     doc_spec = {"S3Object": {"Bucket": s3BucketVaccineCards, "Name": vaccineCardFile}}
@@ -152,7 +152,7 @@ def get_form_dataframe(blocks):
     df = pd.DataFrame(results)
     df = df[df.value_text != '']
     #df[["key_text", "key_confidence", "value_text", "value_confidence"]].head()
-    print(df)
+    # print(df)
     return df
 
 
@@ -167,9 +167,6 @@ def runFormAnalyzeTextract(s3BucketVaccineCards, vaccineCardFile):
     blocks = {block["Id"]: block for page in pages for block in page["Blocks"]}
 
     return get_form_dataframe(blocks)
-    
-    
-
     
     
     #print(pages[0])
@@ -211,6 +208,9 @@ def autocorrect(input, correct_words, view_tags=False):
     return key
 
 def correct_all_table(df):
+    pd.set_option("display.max_rows", None, "display.max_columns", None)
+    # print("table_df:")
+    # print(df)
     correct_words = {'pfizer':'vaccine$ pfizer', 'pfizer xxxxxx':'vaccine$ pfizer', 'pfizer-biontech': 'vaccine$ pfizer', 
         'moderna':'vaccine$ moderna', '1st dose':'dose1', '1st dose covid-19': 'dose1', '2nd Dose': 'dose2', 
         '2nd dose covid-19': 'dose2', 'walgreens': 'walgreens', 'date': 'Date Header',
@@ -228,40 +228,35 @@ def correct_all_table(df):
     return df
 
 def create_final_df(vaccine_card):
+    # Gets form_df
     form_df = runFormAnalyzeTextract(s3BucketVaccineCards, vaccine_card)
     form_df.set_index('key_text', inplace=True)
-    #print(form_df)
     fields = ['First Name','Last Name','Date of birth']
     f_df = pd.DataFrame()
     for i in fields:
         if i in form_df.index:
             f_df[i] = form_df.loc[i]
-        else:
+        else:   # Replaces any missing values with N/A
             f_df[i] = 'N/A'
+        # if i == 'Date of birth':
+        #     f_df[i].replace("/","")
 
+    # Gets table_df
     table_df = runTableAnalyzeTextract(s3BucketVaccineCards, vaccine_card)
     corrected_df = correct_all_table(table_df)
-
-    print("CORRECTED DF REMOVED")
-    print(corrected_df)
-    print(corrected_df.columns)
 
     # Makes sure that first row has the headers we are looking for 
     if corrected_df[0][0]!='Vaccine Header':
         corrected_df = corrected_df[1:]
-    
+    # print(corrected_df)
+   
     new_header = corrected_df.iloc[0] #grab the first row for the header
     corrected_df = corrected_df[1:] #take the data less the header row
     corrected_df.columns = new_header #set the header row as the df header
-
-    print("CORRECTED DF REMOVED FIRST ROW")
-    print(corrected_df)
-    print(corrected_df.columns)
-
+    
     #created separate dfs for the doses because they need to have different column names in the final df
     dose1_df = pd.DataFrame()
     dose2_df = pd.DataFrame()
-    # print(corrected_df.get('Vaccine Header'))
     if 'Vaccine Header' in corrected_df.columns:
         dose1_df = corrected_df.loc[corrected_df['Vaccine Header'] == 'dose1']
         dose1_df = dose1_df.drop("Vaccine Header", axis=1)
@@ -274,11 +269,27 @@ def create_final_df(vaccine_card):
     dose1_df = dose1_df.rename(columns={'Manufacturer Header': 'dose1_manufacturer', 'Date Header': 'dose1_date', 'Site Header': 'dose1_location' })
     dose2_df = dose2_df.rename(columns={'Manufacturer Header': 'dose2_manufacturer', 'Date Header': 'dose2_date', 'Site Header': 'dose2_location' })
 
+    # add date formatting here
+    # ````````````
+    characters_to_remove = "abcdefghijklmnopqrstuvwxyz!@#$%^&*()"
+    characters_to_remove = list(characters_to_remove)
+    updated_dose1_date = str(dose1_df['dose1_date'])
+    updated_dose2_date = str(dose2_df['dose2_date'])
+    print(updated_dose1_date)
+    print(updated_dose2_date)
+    for character in characters_to_remove:
+        updated_dose1_date = updated_dose1_date.replace(character, "")
+        updated_dose2_date = updated_dose2_date.replace(character, "")
+    print(updated_dose1_date)
+    print(updated_dose2_date)
+    dose1_df['dose1_date'] = updated_dose1_date
+    dose2_df['dose2_date'] = updated_dose2_date
+    # print("Dose1 df")
+    # print(dose1_df)
+    # print("Dose2 df")
+    # print(dose2_df)
     frames = [dose1_df, dose2_df]
-    print("FRAMES")
-    print(frames)
     t_df = pd.concat(frames)
-    #print(t_df)
     t_df = t_df.fillna(method='bfill')
     t_df = t_df[:-1]
 
@@ -290,60 +301,38 @@ def create_final_df(vaccine_card):
     final_df = final_df.replace('', "N/A")
     final_df = final_df.replace(np.nan, "N/A")
 
-    flagged_cols = []
-    for i in range(len(final_df.columns)):
-        if (final_df[final_df.columns[i]].str.contains("N/A").any()):
-            flagged_cols.append(i)
-    final_df["Flag"] = str(flagged_cols)[1:-1]
+    # Flags vaccine card (True) if Vaccine card extraction contains any N/A values
+    if "N/A" in final_df.values:
+        final_df["Flag"] = True
+    else:
+        final_df["Flag"] = False
+
+
+    # Removes any unnecessary columns
+    columns_required = ["First Name","Last Name", "Date of birth","dose1_date","dose1_manufacturer","dose1_location","dose2_date","dose2_manufacturer","dose2_location","Flag"]
+    for col in final_df.columns:
+        if col not in columns_required:
+            final_df.drop(col,inplace = True, axis = 1)
+
     pd.set_option("display.max_rows", None, "display.max_columns", None)
-    # print(final_df)
+    print(final_df)
     return final_df
 
 def run():
-    df = create_final_df("VelidandlaU-VaccineCard.jpg")
-    # print(df)
-    
-    print(df)
-    # s3 = boto3.resource('s3')
-    # my_bucket = s3.Bucket(s3BucketVaccineCards)
+    # Run your vaccine card
+    # final_df = create_final_df(vaccineCardFile)
 
-    # final_df  = pd.DataFrame()
-    # for my_bucket_object in my_bucket.objects.all():
-    #     if (my_bucket_object.key != 'IMG_8541.jpg'):
-    #         final_df= final_df.append(create_final_df(my_bucket_object.key),ignore_index=True)
+    # Run entire bucket of vaccine cards
+    s3 = boto3.resource('s3')
+    my_bucket = s3.Bucket(s3BucketVaccineCards)
 
-    # pd.set_option("display.max_rows", None, "display.max_columns", None)
-    # final_df.to_csv("final_output.csv",index = False)
+    final_df  = pd.DataFrame()
+    for my_bucket_object in my_bucket.objects.all():
+        if (my_bucket_object.key != 'IMG_8541.jpg'):
+            final_df= final_df.append(create_final_df(my_bucket_object.key),ignore_index=True)
+
+    pd.set_option("display.max_rows", None, "display.max_columns", None)
+    final_df.to_csv("final_output.csv",index = False)
     
 
 run()
-
-
-
-
-
-
-
-
-#arr = df.to_numpy()
-#for row in range(arr.shape[0]):
-#    for col in range(arr.shape[1]):
-#        if type(arr[row, col]) == str:
-#            arr[row, col] = autocorrect(arr[row, col])
-#print(arr)
-
-
-incorrect_words = ['HizeR', 'Ptizer', 'modna', 'HizeR EW0198', 'wapreeds', 'mg 4355', '1st Dose COVID-19 ']
-
-correct_words = ['pfizer', 'moderna', 'walgreens']
-
-
-
-
-#                    0                                      1                  2                                        3
-#0            Vaccine   Product Name/Manufacturer Lot Number               Date   Healthcare Professional or Clinic Site 
-#1  1st Dose COVID-19                           HizeR EW0198   7/10/21 mm dd yy                                 wapreeds 
-#2           2nd Dose                                 Ptizer             8/2/21                                          
-#3           COVID-19                                 FAT484           mm dd yy                                  mg 4355 
-#4              Other                                              / / mm dd yy                                          
-#5              Other                                              / / mm dd yy                                          
