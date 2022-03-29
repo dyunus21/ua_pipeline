@@ -152,7 +152,7 @@ def get_form_dataframe(blocks):
     df = pd.DataFrame(results)
     df = df[df.value_text != '']
     #df[["key_text", "key_confidence", "value_text", "value_confidence"]].head()
-    print(df)
+    # print(df)
     return df
 
 
@@ -211,11 +211,14 @@ def autocorrect(input, correct_words, view_tags=False):
     return key
 
 def correct_all_table(df):
+    pd.set_option("display.max_rows", None, "display.max_columns", None)
+    print("table_df:")
+    print(df)
     correct_words = {'pfizer':'vaccine$ pfizer', 'pfizer xxxxxx':'vaccine$ pfizer', 'pfizer-biontech': 'vaccine$ pfizer', 
         'moderna':'vaccine$ moderna', '1st dose':'dose1', '1st dose covid-19': 'dose1', '2nd Dose': 'dose2', 
         '2nd dose covid-19': 'dose2', 'walgreens': 'walgreens', 'date': 'Date Header',
-        'product name/manufacturer lot number': 'Manufacturer Header', 'vaccine': 'Vaccine Header',
-        'healthcare professional or clinic site': 'Site Header', 'other': 'none', 'mm dd yy': 'none'}
+        'product name/manufacturer lot number': 'Manufacturer Header','lot number': 'Manufacturer Header', 'vaccine': 'Vaccine Header',
+        'healthcare professional or clinic site': 'Site Header','or clinic site': 'Site Header', 'other': 'none', 'mm dd yy': 'none'}
 
     #print(df)
     for row in range(df.shape[0]):
@@ -245,19 +248,25 @@ def create_final_df(vaccine_card):
     for i in fields:
         if i in form_df.index:
             f_df[i] = form_df.loc[i]
-        else:
+        else:   # Replaces any missing values with N/A
             f_df[i] = 'N/A'
 
+    # Gets table_df
     table_df = runTableAnalyzeTextract(s3BucketVaccineCards, vaccine_card)
     corrected_df = correct_all_table(table_df)
+
+    # Makes sure that first row has the headers we are looking for 
+    if corrected_df[0][0]!='Vaccine Header':
+        corrected_df = corrected_df[1:]
+    # print(corrected_df)
+   
     new_header = corrected_df.iloc[0] #grab the first row for the header
     corrected_df = corrected_df[1:] #take the data less the header row
     corrected_df.columns = new_header #set the header row as the df header
-
+    
     #created separate dfs for the doses because they need to have different column names in the final df
     dose1_df = pd.DataFrame()
     dose2_df = pd.DataFrame()
-    # print(corrected_df.get('Vaccine Header'))
     if 'Vaccine Header' in corrected_df.columns:
         dose1_df = corrected_df.loc[corrected_df['Vaccine Header'] == 'dose1']
         dose1_df = dose1_df.drop("Vaccine Header", axis=1)
@@ -269,35 +278,53 @@ def create_final_df(vaccine_card):
 
     dose1_df = dose1_df.rename(columns={'Manufacturer Header': 'dose1_manufacturer', 'Date Header': 'dose1_date', 'Site Header': 'dose1_location' })
     dose2_df = dose2_df.rename(columns={'Manufacturer Header': 'dose2_manufacturer', 'Date Header': 'dose2_date', 'Site Header': 'dose2_location' })
+    # print("Dose1 df")
+    # print(dose1_df)
+    # print("Dose2 df")
+    # print(dose2_df)
     frames = [dose1_df, dose2_df]
     t_df = pd.concat(frames)
     t_df = t_df.fillna(method='bfill')
     t_df = t_df[:-1]
 
-    #final_df contains form AND table dfs
-    final_frames = [f_df, t_df]
-    final_df = pd.concat(final_frames)
-    final_df = final_df.fillna(method='bfill')
-    final_df = final_df[:-1]
-    final_df = final_df.replace('', "N/A")
-    final_df = final_df.replace(np.nan, "N/A")
-    
     #make sure dose1_manufacturer and dose2 doesn't contain dates (numbers or slashes)
     final_df['dose1_manufacturer'] = delete_dates(final_df['dose1_manufacturer'])
     final_df['dose2_manufacturer'] = delete_dates(final_df['dose2_manufacturer'])
-        
+    
+    #final_df contains form AND table dfs
+    print(final_df)
+    final_df = final_df.fillna(method='bfill')
+    final_df = final_df[:-1]
+    final_df = final_df.replace(np.nan, "N/A")
+    final_df = final_df.replace('', "N/A")
+
+    # Removes any unnecessary columns
+    columns_required = ["First Name","Last Name", "Date of birth","dose1_date","dose1_manufacturer","dose1_location","dose2_date","dose2_manufacturer","dose2_location","Flag"]
+    for col in final_df.columns:
+        if col not in columns_required:
+            final_df.drop(col,inplace = True, axis = 1)
+    
+    
+    
+     # Flags vaccine card (True) if Vaccine card extraction contains any N/A values
     if "N/A" in final_df.values:
         final_df["Flag"] = True
     else:
         final_df["Flag"] = False
+
+
     pd.set_option("display.max_rows", None, "display.max_columns", None)
-    # print(final_df)
+    print(final_df)
     return final_df
 
 def run():
+    # Run your vaccine card
+    # final_df = create_final_df("FullSizeRender.jpeg")
+
+    # Run entire bucket of vaccine cards
     s3 = boto3.resource('s3')
     my_bucket = s3.Bucket(s3BucketVaccineCards)
-    
+
     final_df  = pd.DataFrame()
     for my_bucket_object in my_bucket.objects.all():
         if (my_bucket_object.key != 'IMG_8541.jpg'):
@@ -308,33 +335,3 @@ def run():
     
 
 run()
-
-
-
-
-
-
-
-
-#arr = df.to_numpy()
-#for row in range(arr.shape[0]):
-#    for col in range(arr.shape[1]):
-#        if type(arr[row, col]) == str:
-#            arr[row, col] = autocorrect(arr[row, col])
-#print(arr)
-
-
-incorrect_words = ['HizeR', 'Ptizer', 'modna', 'HizeR EW0198', 'wapreeds', 'mg 4355', '1st Dose COVID-19 ']
-
-correct_words = ['pfizer', 'moderna', 'walgreens']
-
-
-
-
-#                    0                                      1                  2                                        3
-#0            Vaccine   Product Name/Manufacturer Lot Number               Date   Healthcare Professional or Clinic Site 
-#1  1st Dose COVID-19                           HizeR EW0198   7/10/21 mm dd yy                                 wapreeds 
-#2           2nd Dose                                 Ptizer             8/2/21                                          
-#3           COVID-19                                 FAT484           mm dd yy                                  mg 4355 
-#4              Other                                              / / mm dd yy                                          
-#5              Other                                              / / mm dd yy                                          
