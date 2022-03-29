@@ -16,8 +16,8 @@ from nltk.util import ngrams
 s3 = boto3.client("s3")
 textract = boto3.client("textract")
 
-s3BucketVaccineCards = "demovaccinecards2022"  # REPLACE WITH S3 BUCKET NAME
-vaccineCardFile = "Covid_Vaccine_Card.jpg"             # REPLACE FOR CARD IN BUCKET
+s3BucketVaccineCards = "demovaccinecardsiniya"  # REPLACE WITH S3 BUCKET NAME
+vaccineCardFile = "VelidandlaU-VaccineCard.jpg"             # REPLACE FOR CARD IN BUCKET
 
 def start_analyze(s3BucketVaccineCards, vaccineCardFile, feature_type):
     doc_spec = {"S3Object": {"Bucket": s3BucketVaccineCards, "Name": vaccineCardFile}}
@@ -227,6 +227,15 @@ def correct_all_table(df):
     #df.to_csv('sample2.csv')
     return df
 
+def delete_dates(inputString):
+    to_return = ""
+    for char in inputString:
+        if (not char.isdigit()) or (not (char == "/")):
+            to_return += char
+    if (to_return == ""):
+        return "N/A"
+    return to_return
+
 def create_final_df(vaccine_card):
     form_df = runFormAnalyzeTextract(s3BucketVaccineCards, vaccine_card)
     form_df.set_index('key_text', inplace=True)
@@ -272,6 +281,11 @@ def create_final_df(vaccine_card):
     final_df = final_df[:-1]
     final_df = final_df.replace('', "N/A")
     final_df = final_df.replace(np.nan, "N/A")
+    
+    #make sure dose1_manufacturer and dose2 doesn't contain dates (numbers or slashes)
+    final_df['dose1_manufacturer'] = delete_dates(final_df['dose1_manufacturer'])
+    final_df['dose2_manufacturer'] = delete_dates(final_df['dose2_manufacturer'])
+        
     if "N/A" in final_df.values:
         final_df["Flag"] = True
     else:
@@ -283,7 +297,7 @@ def create_final_df(vaccine_card):
 def run():
     s3 = boto3.resource('s3')
     my_bucket = s3.Bucket(s3BucketVaccineCards)
-
+    
     final_df  = pd.DataFrame()
     for my_bucket_object in my_bucket.objects.all():
         if (my_bucket_object.key != 'IMG_8541.jpg'):
