@@ -212,8 +212,8 @@ def autocorrect(input, correct_words, view_tags=False):
 
 def correct_all_table(df):
     pd.set_option("display.max_rows", None, "display.max_columns", None)
-    print("table_df:")
-    print(df)
+    #print("table_df:")
+    #print(df)
     correct_words = {'pfizer':'vaccine$ pfizer', 'pfizer xxxxxx':'vaccine$ pfizer', 'pfizer-biontech': 'vaccine$ pfizer', 
         'moderna':'vaccine$ moderna', '1st dose':'dose1', '1st dose covid-19': 'dose1', '2nd Dose': 'dose2', 
         '2nd dose covid-19': 'dose2', 'walgreens': 'walgreens', 'date': 'Date Header',
@@ -232,8 +232,9 @@ def correct_all_table(df):
 
 def delete_dates(inputString):
     to_return = ""
+    unwanted_digits = ["1", "2", "3", "4", "5", "6", "7", "8", "9", "0", "/"]
     for char in inputString:
-        if (not char.isdigit()) or (not (char == "/")):
+        if (not (char in unwanted_digits)):
             to_return += char
     if (to_return == ""):
         return "N/A"
@@ -286,13 +287,11 @@ def create_final_df(vaccine_card):
     t_df = pd.concat(frames)
     t_df = t_df.fillna(method='bfill')
     t_df = t_df[:-1]
-
-    #make sure dose1_manufacturer and dose2 doesn't contain dates (numbers or slashes)
-    final_df['dose1_manufacturer'] = delete_dates(final_df['dose1_manufacturer'])
-    final_df['dose2_manufacturer'] = delete_dates(final_df['dose2_manufacturer'])
     
+    final_frames = [f_df, t_df]
+    final_df = pd.concat(final_frames)
+
     #final_df contains form AND table dfs
-    print(final_df)
     final_df = final_df.fillna(method='bfill')
     final_df = final_df[:-1]
     final_df = final_df.replace(np.nan, "N/A")
@@ -304,8 +303,10 @@ def create_final_df(vaccine_card):
         if col not in columns_required:
             final_df.drop(col,inplace = True, axis = 1)
     
-    
-    
+    #make sure dose1_manufacturer and dose2 doesn't contain dates (numbers or slashes)
+    final_df['dose1_manufacturer'] = delete_dates(final_df['dose1_manufacturer'][0])
+    final_df['dose2_manufacturer'] = delete_dates(final_df['dose2_manufacturer'][0])
+        
      # Flags vaccine card (True) if Vaccine card extraction contains any N/A values
     if "N/A" in final_df.values:
         final_df["Flag"] = True
@@ -319,19 +320,19 @@ def create_final_df(vaccine_card):
 
 def run():
     # Run your vaccine card
-    # final_df = create_final_df("FullSizeRender.jpeg")
+    final_df = create_final_df(vaccineCardFile)
 
     # Run entire bucket of vaccine cards
-    s3 = boto3.resource('s3')
-    my_bucket = s3.Bucket(s3BucketVaccineCards)
+    # s3 = boto3.resource('s3')
+    # my_bucket = s3.Bucket(s3BucketVaccineCards)
 
-    final_df  = pd.DataFrame()
-    for my_bucket_object in my_bucket.objects.all():
-        if (my_bucket_object.key != 'IMG_8541.jpg'):
-            final_df= final_df.append(create_final_df(my_bucket_object.key),ignore_index=True)
+    # final_df  = pd.DataFrame()
+    # for my_bucket_object in my_bucket.objects.all():
+    #     if (my_bucket_object.key != 'IMG_8541.jpg'):
+    #         final_df = final_df.append(create_final_df(my_bucket_object.key),ignore_index=True)
 
-    pd.set_option("display.max_rows", None, "display.max_columns", None)
-    final_df.to_csv("final_output.csv",index = False)
+    # pd.set_option("display.max_rows", None, "display.max_columns", None)
+    # final_df.to_csv("final_output.csv",index = False)
     
 
 run()
