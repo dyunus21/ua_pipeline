@@ -268,26 +268,19 @@ def create_final_df(vaccine_card):
 
     dose1_df = dose1_df.rename(columns={'Manufacturer Header': 'dose1_manufacturer', 'Date Header': 'dose1_date', 'Site Header': 'dose1_location' })
     dose2_df = dose2_df.rename(columns={'Manufacturer Header': 'dose2_manufacturer', 'Date Header': 'dose2_date', 'Site Header': 'dose2_location' })
-
-    # add date formatting here
-    # ````````````
-    characters_to_remove = "abcdefghijklmnopqrstuvwxyz!@#$%^&*()"
-    characters_to_remove = list(characters_to_remove)
-    updated_dose1_date = str(dose1_df['dose1_date'])
-    updated_dose2_date = str(dose2_df['dose2_date'])
-    print(updated_dose1_date)
-    print(updated_dose2_date)
-    for character in characters_to_remove:
-        updated_dose1_date = updated_dose1_date.replace(character, "")
-        updated_dose2_date = updated_dose2_date.replace(character, "")
-    print(updated_dose1_date)
-    print(updated_dose2_date)
-    dose1_df['dose1_date'] = updated_dose1_date
-    dose2_df['dose2_date'] = updated_dose2_date
-    # print("Dose1 df")
+    # ~ ~ ~ ~ ~ ~ ~ ~ DATE FORMATTING ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ 
+    
+    # print("~~~~~~~~")
     # print(dose1_df)
-    # print("Dose2 df")
-    # print(dose2_df)
+    # print("~~~~~~~~")
+    # dose1_df['dose1_date'] = pd.to_datetime(dose1_df['dose1_date'])
+    # dose2_df['dose2_date'] = pd.to_datetime(dose1_df['dose2_date'])
+    
+    # test 4/5
+    # trying to use to_datetime() method (pandas) results in 
+    # unrecognized value type errors or unknown string format errors
+    
+    # ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ 
     frames = [dose1_df, dose2_df]
     t_df = pd.concat(frames)
     t_df = t_df.fillna(method='bfill')
