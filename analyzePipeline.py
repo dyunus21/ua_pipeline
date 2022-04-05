@@ -27,6 +27,16 @@ def start_analyze(s3BucketVaccineCards, vaccineCardFile, feature_type):
     )
     return response["JobId"]
 
+def delete_dates(inputString):
+    print(str(inputString))
+    to_return = ""
+    for char in inputString:
+        if (not char.isdigit()) or (not (char == "/")):
+            to_return += char
+    if (to_return == ""):
+        return "N/A"
+    return to_return
+
 def CheckAnalyzeJobComplete(jobId):
     time.sleep(5)
     response = textract.get_document_analysis(JobId=jobId)
@@ -212,8 +222,8 @@ def autocorrect(input, correct_words, view_tags=False):
 
 def correct_all_table(df):
     pd.set_option("display.max_rows", None, "display.max_columns", None)
-    print("table_df:")
-    print(df)
+    # print("table_df:")
+    # print(df)
     correct_words = {'pfizer':'vaccine$ pfizer', 'pfizer xxxxxx':'vaccine$ pfizer', 'pfizer-biontech': 'vaccine$ pfizer', 
         'moderna':'vaccine$ moderna', '1st dose':'dose1', '1st dose covid-19': 'dose1', '2nd Dose': 'dose2', 
         '2nd dose covid-19': 'dose2', 'walgreens': 'walgreens', 'date': 'Date Header',
@@ -225,7 +235,13 @@ def correct_all_table(df):
         for col in range(df.shape[1]):
             # https://www.stackvidhya.com/get-value-of-cell-from-a-pandas-dataframe/
             if type(df.iat[row,col]) == str:
+                if "pfizer" in df.iat[row,col].lower():
+                    df.iat[row,col] = "vaccine$ pfizer"
+                if "moderna" in df.iat[row,col].lower():
+                    df.iat[row,col] = "vaccine$ moderna"
                 df.iat[row,col] = autocorrect(df.iat[row,col], correct_words, False)
+                
+
     #print(df)
     #df.to_csv('sample2.csv')
     return df
@@ -281,7 +297,7 @@ def create_final_df(vaccine_card):
     #final_df contains form AND table dfs
     final_frames = [f_df, t_df]
     final_df = pd.concat(final_frames)
-    print(final_df)
+    # print(final_df)
     final_df = final_df.fillna(method='bfill')
     final_df = final_df[:-1]
     final_df = final_df.replace(np.nan, "N/A")
@@ -292,14 +308,17 @@ def create_final_df(vaccine_card):
     for col in final_df.columns:
         if col not in columns_required:
             final_df.drop(col,inplace = True, axis = 1)
-    
-    
+
+    #make sure dose1_manufacturer and dose2 doesn't contain dates (numbers or slashes)
+    final_df['dose1_manufacturer'] = delete_dates(final_df['dose1_manufacturer'])
+    final_df['dose2_manufacturer'] = delete_dates(final_df['dose2_manufacturer'])
     
      # Flags vaccine card (True) if Vaccine card extraction contains any N/A values
-    if "N/A" in final_df.values:
-        final_df["Flag"] = True
-    else:
-        final_df["Flag"] = False
+    flagged_cols = []
+    for i in range(len(final_df.columns)):
+        if (final_df[final_df.columns[i]].str.contains("N/A").any()):
+            flagged_cols.append(i)
+    final_df["Flag"] = str(flagged_cols)[1:-1]
 
 
     pd.set_option("display.max_rows", None, "display.max_columns", None)
@@ -308,7 +327,7 @@ def create_final_df(vaccine_card):
 
 def run():
     # Run your vaccine card
-    # final_df = create_final_df("FullSizeRender.jpeg")
+    # final_df = create_final_df("VelidandlaU-VaccineCard.jpg")
 
     # Run entire bucket of vaccine cards
     s3 = boto3.resource('s3')
@@ -316,7 +335,7 @@ def run():
 
     final_df  = pd.DataFrame()
     for my_bucket_object in my_bucket.objects.all():
-        if (my_bucket_object.key != 'IMG_8541.jpg'):
+        if (my_bucket_object.key != 'IMG_8541.jpg' and my_bucket_object.key != vaccineCardFile ):
             final_df= final_df.append(create_final_df(my_bucket_object.key),ignore_index=True)
 
     pd.set_option("display.max_rows", None, "display.max_columns", None)
