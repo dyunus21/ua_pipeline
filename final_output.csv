@@ -1,18 +1,18 @@
 First Name,Last Name,Date of birth,dose1_manufacturer,dose1_date,dose1_location,dose2_manufacturer,dose2_date,dose2_location,Flag
-Leah,Courtney,11/08/2000 IIS record,vaccine$ moderna,yy ,N/A,044AZIA MODERNA ,MARmit 19 2.2021 ,JBricker RN ,True
-Shloaka,Denvir,3/13/2003,,33121 ,,,/ / ,,True
-ILana,KaveN,02/18/03,,,,,,,False
-Joshmita,Chintala,(31/2001,vaccine$ pfizer,3/2421 mm dd yy ,walgreens,vaccine$ pfizer,4/2121 ,walgreens,False
-Anagha,shenoy,10/12/03,vaccine$ pfizer,APR 2 0_2021 mm dd yy ,walgreens,N/A,N/A,N/A,True
-Kriti,vacunas Mathur,11/02/2003,,3/6/21,,,de ,,False
-N/A,N/A,08/26/,vaccine$ pfizer,03/01 121 ,walgreens,vaccine$ pfizer,03/23/21,walgreens,True
-N/A,N/A,5/13/1,vaccine$ moderna,2/13/21,N/A,dose2,3/13/21,walgreens,True
-N/A,of 1/22/ birth,N/A,Moderna 026 B2IA ,4/12/21,walgreens,Modernw 041B21A ,dose1,DAPeHealth ,True
-N/A,N/A,7/19/,MODERNA 017B21A ,dose1,VCHD ,Modema 037B21A ,dose1,VCHO 696annel ,True
-00749,41171,N/A,vaccine$ pfizer,03/12/21,N/A,vaccine$ pfizer,04/02/21,NMHC ,True
-KELSI,PADA LIA,N/A,vaccine$ pfizer,04/32/21,WIHD ,vaccine$ pfizer,05/05/21,WCHD ,True
-Shivani,Agrawal,2-13-2001,vaccine$ pfizer,7/24/21,as 3938 ,vaccine$ pfizer,8/13/21,CUS ,False
-RIYA,GYA NMOTE,1-29 2001,vaccine$ pfizer,none,walgreens,N/A,4/15/21,walgreens,True
-Uditha,vell dandla,5/8/02,PFIZER COVID-19 LOT# ER8730 ,04/01/2021,SAFEWAY # 1197 ,07/31/2021,N/A,N/A,True
-Yatri,Sutaria,10-11-2002,Moderna 040B2IA ,4/6/21,CTUC ,moderna 006C21A ,5/3/21,CIVC ,False
-N/A,SANTHANAM JESSICA First Name Mi,N/A,vaccine$ pfizer,4/10/21,PHCS ,vaccine$ pfizer,05/08/21,PHCS ,True
+Leah,Courtney,11/08/2000 IIS record,Site Header,yy ,N/A,Site Header,MARmit 19 2.2021 ,JBricker RN ,5
+Shloaka,Denvir,3/13/03,vaccine$ pfizer,33121,N/A,N/A,/ / ,N/A,"5, 6, 8"
+ILana,KaveN,2/18/03,vaccine$ moderna,,Watyro ,Site Header,,walgreens,
+Joshmita,Chintala,(31/2001,vaccine$ pfizer,3/2421 mm dd yy ,walgreens,vaccine$ pfizer,Apr-21,walgreens,
+Anagha,shenoy,10/12/03,Site Header,APR 2 0_2021 mm dd yy ,walgreens,N/A,N/A,N/A,"6, 7, 8"
+Kriti,vacunas Mathur,11/2/03,Site Header,3/6/21,Vaccine Header,COVID19 ,de ,Vaccine Header,
+N/A,N/A,08/26/,vaccine$ pfizer,03/01 121 ,walgreens,vaccine$ pfizer,3/23/21,walgreens,"0, 1"
+N/A,N/A,5/13/01,Site Header,2/13/21,N/A,dose2,3/13/21,walgreens,"0, 1, 5"
+N/A,of 1/22/ birth,N/A,Site Header,4/12/21,walgreens,Modernw 041B21A ,dose1,DAPeHealth ,"0, 2"
+N/A,N/A,7/19/,Site Header,dose1,VCHD ,Modema 037B21A ,dose1,VCHO 696annel ,"0, 1"
+749,41171,N/A,vaccine$ pfizer,3/12/21,N/A,vaccine$ pfizer,4/2/21,NMHC ,"2, 5"
+KELSI,PADA LIA,N/A,vaccine$ pfizer,04/32/21,WIHD ,vaccine$ pfizer,5/5/21,WCHD ,2
+Shivani,Agrawal,2/13/01,vaccine$ pfizer,7/24/21,as 3938 ,vaccine$ pfizer,8/13/21,CUS ,
+RIYA,GYA NMOTE,1-29 2001,vaccine$ pfizer,none,walgreens,N/A,4/15/21,walgreens,6
+Uditha,vell dandla,5/8/02,Site Header,4/1/21,SAFEWAY # 1197 ,7/31/21,N/A,N/A,"7, 8"
+Yatri,Sutaria,10/11/02,Site Header,4/6/21,CTUC ,Site Header,5/3/21,CIVC ,
+N/A,SANTHANAM JESSICA First Name Mi,N/A,Site Header,4/10/21,PHCS ,Site Header,5/8/21,PHCS ,"0, 2"
