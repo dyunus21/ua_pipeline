@@ -27,6 +27,16 @@ def start_analyze(s3BucketVaccineCards, vaccineCardFile, feature_type):
     )
     return response["JobId"]
 
+def delete_dates(inputString):
+    print(str(inputString))
+    to_return = ""
+    for char in inputString:
+        if (not char.isdigit()) or (not (char == "/")):
+            to_return += char
+    if (to_return == ""):
+        return "N/A"
+    return to_return
+
 def CheckAnalyzeJobComplete(jobId):
     time.sleep(5)
     response = textract.get_document_analysis(JobId=jobId)
@@ -169,6 +179,9 @@ def runFormAnalyzeTextract(s3BucketVaccineCards, vaccineCardFile):
     return get_form_dataframe(blocks)
     
     
+
+    
+    
     #print(pages[0])
     #with open('test.json', 'w') as json_file:
         #json.dump(pages[0], json_file)
@@ -214,15 +227,21 @@ def correct_all_table(df):
     correct_words = {'pfizer':'vaccine$ pfizer', 'pfizer xxxxxx':'vaccine$ pfizer', 'pfizer-biontech': 'vaccine$ pfizer', 
         'moderna':'vaccine$ moderna', '1st dose':'dose1', '1st dose covid-19': 'dose1', '2nd Dose': 'dose2', 
         '2nd dose covid-19': 'dose2', 'walgreens': 'walgreens', 'date': 'Date Header',
-        'product name/manufacturer lot number': 'Manufacturer Header', 'vaccine': 'Vaccine Header',
-        'healthcare professional or clinic site': 'Site Header', 'other': 'none', 'mm dd yy': 'none'}
+        'product name/manufacturer lot number': 'Manufacturer Header','lot number': 'Manufacturer Header', 'vaccine': 'Vaccine Header',
+        'healthcare professional or clinic site': 'Site Header','or clinic site': 'Site Header', 'other': 'none', 'mm dd yy': 'none'}
 
     #print(df)
     for row in range(df.shape[0]):
         for col in range(df.shape[1]):
             # https://www.stackvidhya.com/get-value-of-cell-from-a-pandas-dataframe/
             if type(df.iat[row,col]) == str:
+                if "pfizer" in df.iat[row,col].lower():
+                    df.iat[row,col] = "vaccine$ pfizer"
+                if "moderna" in df.iat[row,col].lower():
+                    df.iat[row,col] = "vaccine$ moderna"
                 df.iat[row,col] = autocorrect(df.iat[row,col], correct_words, False)
+                
+
     #print(df)
     #df.to_csv('sample2.csv')
     return df
@@ -238,8 +257,6 @@ def create_final_df(vaccine_card):
             f_df[i] = form_df.loc[i]
         else:   # Replaces any missing values with N/A
             f_df[i] = 'N/A'
-        # if i == 'Date of birth':
-        #     f_df[i].replace("/","")
 
     # Gets table_df
     table_df = runTableAnalyzeTextract(s3BucketVaccineCards, vaccine_card)
@@ -268,24 +285,10 @@ def create_final_df(vaccine_card):
 
     dose1_df = dose1_df.rename(columns={'Manufacturer Header': 'dose1_manufacturer', 'Date Header': 'dose1_date', 'Site Header': 'dose1_location' })
     dose2_df = dose2_df.rename(columns={'Manufacturer Header': 'dose2_manufacturer', 'Date Header': 'dose2_date', 'Site Header': 'dose2_location' })
-    # ~ ~ ~ ~ ~ ~ ~ ~ DATE FORMATTING ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ 
-    
-    #print(dose1_df)
-    characters_to_remove = "abcdefghijklmnopqrstuvwxyz!@#$%^&*()"
-    characters_to_remove = list(characters_to_remove)
-    updated_dose1_date = str(dose1_df.at[0, 'dose1_date'])
-    updated_dose2_date = str(dose2_df['dose2_date'][0])
-    print(updated_dose1_date)
-    print(updated_dose2_date)
-    for character in characters_to_remove:
-        updated_dose1_date = updated_dose1_date.replace(character, "")
-        updated_dose2_date = updated_dose2_date.replace(character, "")
-    print(updated_dose1_date)
-    print(updated_dose2_date)
-    dose1_df['dose1_date'][0] = updated_dose1_date
-    dose2_df['dose2_date'][0] = updated_dose2_date
-    
-    # ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ 
+    # print("Dose1 df")
+    # print(dose1_df)
+    # print("Dose2 df")
+    # print(dose2_df)
     frames = [dose1_df, dose2_df]
     t_df = pd.concat(frames)
     t_df = t_df.fillna(method='bfill')
@@ -294,17 +297,11 @@ def create_final_df(vaccine_card):
     #final_df contains form AND table dfs
     final_frames = [f_df, t_df]
     final_df = pd.concat(final_frames)
+    # print(final_df)
     final_df = final_df.fillna(method='bfill')
     final_df = final_df[:-1]
-    final_df = final_df.replace('', "N/A")
     final_df = final_df.replace(np.nan, "N/A")
-
-    # Flags vaccine card (True) if Vaccine card extraction contains any N/A values
-    if "N/A" in final_df.values:
-        final_df["Flag"] = True
-    else:
-        final_df["Flag"] = False
-
+    final_df = final_df.replace('', "N/A")
 
     # Removes any unnecessary columns
     columns_required = ["First Name","Last Name", "Date of birth","dose1_date","dose1_manufacturer","dose1_location","dose2_date","dose2_manufacturer","dose2_location","Flag"]
@@ -312,25 +309,62 @@ def create_final_df(vaccine_card):
         if col not in columns_required:
             final_df.drop(col,inplace = True, axis = 1)
 
+    #make sure dose1_manufacturer and dose2 doesn't contain dates (numbers or slashes)
+    final_df['dose1_manufacturer'] = delete_dates(final_df['dose1_manufacturer'])
+    final_df['dose2_manufacturer'] = delete_dates(final_df['dose2_manufacturer'])
+    
+    characters_to_remove = "abcdefghijklmnopqrstuvwxyz!@#$%^&*()/"
+    characters_to_remove = list(characters_to_remove)
+    updated_dose1_date = final_df['dose1_date'][0]
+    updated_dose2_date = final_df['dose2_date'][0]
+    print(updated_dose1_date)
+    print(updated_dose2_date)
+    for character in characters_to_remove:
+        updated_dose1_date = updated_dose1_date.replace(character, "")
+        updated_dose2_date = updated_dose2_date.replace(character, "")
+    # print(updated_dose1_date)
+    # print(updated_dose2_date)
+    final_df['dose1_date'][0] = updated_dose1_date
+    final_df['dose2_date'][0] = updated_dose2_date
+
+    final_df['dose1_date'][0] = pd.to_datetime(final_df['dose1_date'][0])
+    final_df['dose2_date'][0] = pd.to_datetime(final_df['dose2_date'][0])
+
+     # Flags vaccine card (True) if Vaccine card extraction contains any N/A values
+    flagged_cols = []
+    for i in range(len(final_df.columns)):
+        if (final_df[final_df.columns[i]].str.contains("N/A").any()):
+            flagged_cols.append(i)
+    final_df["Flag"] = str(flagged_cols)[1:-1]
+
+
     pd.set_option("display.max_rows", None, "display.max_columns", None)
     print(final_df)
     return final_df
 
 def run():
     # Run your vaccine card
-    # final_df = create_final_df(vaccineCardFile)
+    final_df = create_final_df("IMG_2925 (2).jpg")
 
     # Run entire bucket of vaccine cards
-    s3 = boto3.resource('s3')
-    my_bucket = s3.Bucket(s3BucketVaccineCards)
+    # s3 = boto3.resource('s3')
+    # my_bucket = s3.Bucket(s3BucketVaccineCards)
 
-    final_df  = pd.DataFrame()
-    for my_bucket_object in my_bucket.objects.all():
-        if (my_bucket_object.key != 'IMG_8541.jpg'):
-            final_df= final_df.append(create_final_df(my_bucket_object.key),ignore_index=True)
+    # final_df  = pd.DataFrame()
+    # for my_bucket_object in my_bucket.objects.all():
+    #     if (my_bucket_object.key != 'IMG_8541.jpg' and my_bucket_object.key != vaccineCardFile ):
+    #         final_df= final_df.append(create_final_df(my_bucket_object.key),ignore_index=True)
 
-    pd.set_option("display.max_rows", None, "display.max_columns", None)
-    final_df.to_csv("final_output.csv",index = False)
+    # pd.set_option("display.max_rows", None, "display.max_columns", None)
+    # final_df.to_csv("final_output.csv",index = False)
     
 
 run()
+
+
+
+
+
+
+
+
