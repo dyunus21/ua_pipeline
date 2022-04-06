@@ -16,8 +16,8 @@ from nltk.util import ngrams
 s3 = boto3.client("s3")
 textract = boto3.client("textract")
 
-s3BucketVaccineCards = "demovaccinecardsiniya"  # REPLACE WITH S3 BUCKET NAME
-vaccineCardFile = "VelidandlaU-VaccineCard.jpg"             # REPLACE FOR CARD IN BUCKET
+s3BucketVaccineCards = "demovaccinecards2022"  # REPLACE WITH S3 BUCKET NAME
+vaccineCardFile = "Covid_Vaccine_Card_old.jpg"             # REPLACE FOR CARD IN BUCKET
 
 def start_analyze(s3BucketVaccineCards, vaccineCardFile, feature_type):
     doc_spec = {"S3Object": {"Bucket": s3BucketVaccineCards, "Name": vaccineCardFile}}
@@ -26,6 +26,16 @@ def start_analyze(s3BucketVaccineCards, vaccineCardFile, feature_type):
         DocumentLocation=doc_spec, FeatureTypes=[feature_type]
     )
     return response["JobId"]
+
+def delete_dates(inputString):
+    print(str(inputString))
+    to_return = ""
+    for char in inputString:
+        if (not char.isdigit()) or (not (char == "/")):
+            to_return += char
+    if (to_return == ""):
+        return "N/A"
+    return to_return
 
 def CheckAnalyzeJobComplete(jobId):
     time.sleep(5)
@@ -225,7 +235,13 @@ def correct_all_table(df):
         for col in range(df.shape[1]):
             # https://www.stackvidhya.com/get-value-of-cell-from-a-pandas-dataframe/
             if type(df.iat[row,col]) == str:
+                if "pfizer" in df.iat[row,col].lower():
+                    df.iat[row,col] = "vaccine$ pfizer"
+                if "moderna" in df.iat[row,col].lower():
+                    df.iat[row,col] = "vaccine$ moderna"
                 df.iat[row,col] = autocorrect(df.iat[row,col], correct_words, False)
+                
+
     #print(df)
     #df.to_csv('sample2.csv')
     return df
@@ -241,10 +257,12 @@ def delete_dates(inputString):
     return to_return
 
 def create_final_df(vaccine_card):
+    # Gets form_df
     form_df = runFormAnalyzeTextract(s3BucketVaccineCards, vaccine_card)
     form_df.set_index('key_text', inplace=True)
-    #print(form_df)
+    
     fields = ['First Name','Last Name','Date of birth']
+    
     f_df = pd.DataFrame()
     for i in fields:
         if i in form_df.index:
@@ -308,10 +326,11 @@ def create_final_df(vaccine_card):
     final_df['dose2_manufacturer'] = delete_dates(final_df['dose2_manufacturer'][0])
         
      # Flags vaccine card (True) if Vaccine card extraction contains any N/A values
-    if "N/A" in final_df.values:
-        final_df["Flag"] = True
-    else:
-        final_df["Flag"] = False
+    flagged_cols = []
+    for i in range(len(final_df.columns)):
+        if (final_df[final_df.columns[i]].str.contains("N/A").any()):
+            flagged_cols.append(i)
+    final_df["Flag"] = str(flagged_cols)[1:-1]
 
 
     pd.set_option("display.max_rows", None, "display.max_columns", None)
@@ -336,3 +355,12 @@ def run():
     
 
 run()
+
+
+
+
+
+
+
+
+
