@@ -37,6 +37,34 @@ def delete_dates(inputString):
         return "N/A"
     return to_return
 
+def format_as_date(updated_dose1_date, updated_dose2_date, updated_dob_date):
+    # List of characters to remove (including space)
+    characters_to_remove = "abcdefghijklmnopqrstuvwxyz!@#$%^&*()/ "
+    characters_to_remove = list(characters_to_remove)
+    # Delete characters (replace each char with "")
+    for character in characters_to_remove:
+        updated_dose1_date = updated_dose1_date.replace(character, "")
+        updated_dose2_date = updated_dose2_date.replace(character, "")
+        updated_dob_date = updated_dob_date.replace(character, "")
+    # Reverse the dates
+    updated_dose1_date=updated_dose1_date[len(updated_dose1_date)::-1]
+    updated_dose2_date=updated_dose2_date[len(updated_dose2_date)::-1]
+    updated_dob_date=updated_dob_date[len(updated_dob_date)::-1]
+    # Add a slash after every two characters
+    updated_dose1_date = '/'.join(updated_dose1_date[i:i + 2] for i in range(0, len(updated_dose1_date), 2))
+    updated_dose2_date = '/'.join(updated_dose2_date[i:i + 2] for i in range(0, len(updated_dose2_date), 2))
+    updated_dob_date = '/'.join(updated_dob_date[i:i + 2] for i in range(0, len(updated_dob_date), 2))
+    # Reverse the dates again
+    updated_dose1_date = updated_dose1_date[len(updated_dose1_date)::-1]
+    updated_dose2_date = updated_dose2_date[len(updated_dose2_date)::-1]
+    updated_dob_date = updated_dob_date[len(updated_dob_date)::-1]
+    updated_dates = []
+    updated_dates.append(updated_dose1_date)
+    updated_dates.append(updated_dose2_date)
+    updated_dates.append(updated_dob_date)
+    # Add all the updated dates to an array and return
+    return updated_dates
+
 def CheckAnalyzeJobComplete(jobId):
     time.sleep(5)
     response = textract.get_document_analysis(JobId=jobId)
@@ -309,26 +337,19 @@ def create_final_df(vaccine_card):
         if col not in columns_required:
             final_df.drop(col,inplace = True, axis = 1)
 
-    #make sure dose1_manufacturer and dose2 doesn't contain dates (numbers or slashes)
+    # Make sure dose1_manufacturer and dose2_manufacturer don't contain dates (numbers or slashes)
     final_df['dose1_manufacturer'] = delete_dates(final_df['dose1_manufacturer'])
     final_df['dose2_manufacturer'] = delete_dates(final_df['dose2_manufacturer'])
     
-    characters_to_remove = "abcdefghijklmnopqrstuvwxyz!@#$%^&*()/"
-    characters_to_remove = list(characters_to_remove)
-    updated_dose1_date = final_df['dose1_date'][0]
-    updated_dose2_date = final_df['dose2_date'][0]
-    print(updated_dose1_date)
-    print(updated_dose2_date)
-    for character in characters_to_remove:
-        updated_dose1_date = updated_dose1_date.replace(character, "")
-        updated_dose2_date = updated_dose2_date.replace(character, "")
-    # print(updated_dose1_date)
-    # print(updated_dose2_date)
-    final_df['dose1_date'][0] = updated_dose1_date
-    final_df['dose2_date'][0] = updated_dose2_date
+    # Update dates array using format_as_date function 
+    # + Removes all special characters, spaces
+    # + Re-adds slashes starting from back of the date to achieve desired formatting
+    updated_dates = format_as_date(final_df['dose1_date'][0], final_df['dose2_date'][0], final_df['Date of birth'][0])
 
-    final_df['dose1_date'][0] = pd.to_datetime(final_df['dose1_date'][0])
-    final_df['dose2_date'][0] = pd.to_datetime(final_df['dose2_date'][0])
+    # Replace the dates with their updated versions in final_df
+    final_df['dose1_date'][0] = updated_dates[0]
+    final_df['dose2_date'][0] = updated_dates[1]
+    final_df['Date of birth'][0] = updated_dates[2]
 
      # Flags vaccine card (True) if Vaccine card extraction contains any N/A values
     flagged_cols = []
