@@ -16,8 +16,8 @@ from nltk.util import ngrams
 s3 = boto3.client("s3")
 textract = boto3.client("textract")
 
-s3BucketVaccineCards = "demovaccinecards123"  # REPLACE WITH S3 BUCKET NAME
-vaccineCardFile = "IMG_5027 (1).jpeg"             # REPLACE FOR CARD IN BUCKET
+s3BucketVaccineCards = "demovaccinecards2022"  # REPLACE WITH S3 BUCKET NAME
+vaccineCardFile = "Covid_Vaccine_Card_old.jpg"             # REPLACE FOR CARD IN BUCKET
 
 def start_analyze(s3BucketVaccineCards, vaccineCardFile, feature_type):
     doc_spec = {"S3Object": {"Bucket": s3BucketVaccineCards, "Name": vaccineCardFile}}
@@ -204,10 +204,6 @@ def runFormAnalyzeTextract(s3BucketVaccineCards, vaccineCardFile):
 
     return get_form_dataframe(blocks)
     
-    
-
-    
-    
     #print(pages[0])
     #with open('test.json', 'w') as json_file:
         #json.dump(pages[0], json_file)
@@ -248,8 +244,8 @@ def autocorrect(input, correct_words, view_tags=False):
 
 def correct_all_table(df):
     pd.set_option("display.max_rows", None, "display.max_columns", None)
-    # print("table_df:")
-    # print(df)
+    #print("table_df:")
+    #print(df)
     correct_words = {'pfizer':'vaccine$ pfizer', 'pfizer xxxxxx':'vaccine$ pfizer', 'pfizer-biontech': 'vaccine$ pfizer', 
         'moderna':'vaccine$ moderna', '1st dose':'dose1', '1st dose covid-19': 'dose1', '2nd Dose': 'dose2', 
         '2nd dose covid-19': 'dose2', 'walgreens': 'walgreens', 'date': 'Date Header',
@@ -271,6 +267,16 @@ def correct_all_table(df):
     #print(df)
     #df.to_csv('sample2.csv')
     return df
+
+def delete_dates(inputString):
+    to_return = ""
+    unwanted_digits = ["1", "2", "3", "4", "5", "6", "7", "8", "9", "0", "/"]
+    for char in inputString:
+        if (not (char in unwanted_digits)):
+            to_return += char
+    if (to_return == ""):
+        return "N/A"
+    return to_return
 
 def create_final_df(vaccine_card):
     # Gets form_df
@@ -348,7 +354,6 @@ def create_final_df(vaccine_card):
     final_df['dose1_date'][0] = updated_dates[0]
     final_df['dose2_date'][0] = updated_dates[1]
     final_df['Date of birth'][0] = updated_dates[2]
-
      # Flags vaccine card (True) if Vaccine card extraction contains any N/A values
     flagged_cols = []
     for i in range(len(final_df.columns)):
@@ -363,7 +368,7 @@ def create_final_df(vaccine_card):
 
 def run():
     # Run your vaccine card
-    final_df = create_final_df("IMG_2925 (2).jpg")
+    final_df = create_final_df(vaccineCardFile)
 
     # Run entire bucket of vaccine cards
     # s3 = boto3.resource('s3')
@@ -371,19 +376,11 @@ def run():
 
     # final_df  = pd.DataFrame()
     # for my_bucket_object in my_bucket.objects.all():
-    #     if (my_bucket_object.key != 'IMG_8541.jpg' and my_bucket_object.key != vaccineCardFile ):
-    #         final_df= final_df.append(create_final_df(my_bucket_object.key),ignore_index=True)
+    #     if (my_bucket_object.key != 'IMG_8541.jpg'):
+    #         final_df = final_df.append(create_final_df(my_bucket_object.key),ignore_index=True)
 
     # pd.set_option("display.max_rows", None, "display.max_columns", None)
     # final_df.to_csv("final_output.csv",index = False)
     
 
 run()
-
-
-
-
-
-
-
-
