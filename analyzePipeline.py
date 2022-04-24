@@ -58,11 +58,9 @@ def format_as_date(updated_dose1_date, updated_dose2_date, updated_dob_date):
     updated_dose1_date = updated_dose1_date[len(updated_dose1_date)::-1]
     updated_dose2_date = updated_dose2_date[len(updated_dose2_date)::-1]
     updated_dob_date = updated_dob_date[len(updated_dob_date)::-1]
-    updated_dates = []
-    updated_dates.append(updated_dose1_date)
-    updated_dates.append(updated_dose2_date)
-    updated_dates.append(updated_dob_date)
     # Add all the updated dates to an array and return
+    updated_dates = []
+    updated_dates.extend((updated_dose1_date, updated_dose2_date, updated_dob_date))
     return updated_dates
 
 def CheckAnalyzeJobComplete(jobId):
