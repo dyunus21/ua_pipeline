@@ -16,8 +16,8 @@ from nltk.util import ngrams
 s3 = boto3.client("s3")
 textract = boto3.client("textract")
 
-s3BucketVaccineCards = "demovaccinecards2022"  # REPLACE WITH S3 BUCKET NAME
-vaccineCardFile = "Covid_Vaccine_Card_old.jpg"             # REPLACE FOR CARD IN BUCKET
+s3BucketVaccineCards = "demovaccinecards123"  # REPLACE WITH S3 BUCKET NAME
+vaccineCardFile = "IMG_5027 (1).jpeg"             # REPLACE FOR CARD IN BUCKET
 
 def start_analyze(s3BucketVaccineCards, vaccineCardFile, feature_type):
     doc_spec = {"S3Object": {"Bucket": s3BucketVaccineCards, "Name": vaccineCardFile}}
@@ -36,6 +36,49 @@ def delete_dates(inputString):
     if (to_return == ""):
         return "N/A"
     return to_return
+
+def format_as_date(updated_dose1_date, updated_dose2_date, updated_dob_date):
+    # List of characters to remove (including space)
+    characters_to_remove = "~-_+=\{\}'\".,?\:;<>[]ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz!@#$%^&*()/ "
+    characters_to_remove = list(characters_to_remove)
+    # Delete characters (replace each char with "")
+    for character in characters_to_remove:
+        updated_dose1_date = updated_dose1_date.replace(character, "")
+        updated_dose2_date = updated_dose2_date.replace(character, "")
+        updated_dob_date = updated_dob_date.replace(character, "")
+    # Reverse the dates
+    updated_dose1_date=updated_dose1_date[len(updated_dose1_date)::-1]
+    updated_dose2_date=updated_dose2_date[len(updated_dose2_date)::-1]
+    updated_dob_date=updated_dob_date[len(updated_dob_date)::-1]
+    # Add a slash after every two characters
+    updated_dose1_date = '/'.join(updated_dose1_date[i:i + 2] for i in range(0, len(updated_dose1_date), 2))
+    updated_dose2_date = '/'.join(updated_dose2_date[i:i + 2] for i in range(0, len(updated_dose2_date), 2))
+    updated_dob_date = '/'.join(updated_dob_date[i:i + 2] for i in range(0, len(updated_dob_date), 2))
+    # Reverse the dates again
+    updated_dose1_date = updated_dose1_date[len(updated_dose1_date)::-1]
+    updated_dose2_date = updated_dose2_date[len(updated_dose2_date)::-1]
+    updated_dob_date = updated_dob_date[len(updated_dob_date)::-1]
+    # Account for mm/dd/yyyy format
+    if len(updated_dose1_date) >= 10:
+        extra_slash_index = updated_dose1_date.rfind("/")
+        updated_dose1_date = updated_dose1_date[:extra_slash_index] + updated_dose1_date[extra_slash_index+1:]
+    if len(updated_dose2_date) >= 10:
+        extra_slash_index = updated_dose2_date.rfind("/")
+        updated_dose2_date = updated_dose2_date[:extra_slash_index] + updated_dose2_date[extra_slash_index+1:]
+    if len(updated_dob_date) >= 10:
+        extra_slash_index = updated_dob_date.rfind("/")
+        updated_dob_date = updated_dob_date[:extra_slash_index] + updated_dob_date[extra_slash_index+1:]
+    # Account for m/d/yy format
+    if len(updated_dose1_date) <= 5 and len(updated_dose1_date) > 0:
+        updated_dose1_date = updated_dose1_date[:1] + "/" + updated_dose1_date[1:]
+    if len(updated_dose2_date) <= 5 and len(updated_dose2_date) > 0:
+        updated_dose2_date = updated_dose2_date[:1] + "/" + updated_dose2_date[1:]
+    if len(updated_dob_date) <= 5 and len(updated_dob_date) > 0:
+        updated_dob_date = updated_dob_date[:1] + "/" + updated_dob_date[1:]
+    # Add all the updated dates to an array and return
+    updated_dates = []
+    updated_dates.extend((updated_dose1_date, updated_dose2_date, updated_dob_date))
+    return updated_dates
 
 def CheckAnalyzeJobComplete(jobId):
     time.sleep(5)
@@ -222,8 +265,8 @@ def autocorrect(input, correct_words, view_tags=False):
 
 def correct_all_table(df):
     pd.set_option("display.max_rows", None, "display.max_columns", None)
-    #print("table_df:")
-    #print(df)
+    # print("table_df:")
+    # print(df)
     correct_words = {'pfizer':'vaccine$ pfizer', 'pfizer xxxxxx':'vaccine$ pfizer', 'pfizer-biontech': 'vaccine$ pfizer', 
         'moderna':'vaccine$ moderna', '1st dose':'dose1', '1st dose covid-19': 'dose1', '2nd Dose': 'dose2', 
         '2nd dose covid-19': 'dose2', 'walgreens': 'walgreens', 'date': 'Date Header',
@@ -246,23 +289,11 @@ def correct_all_table(df):
     #df.to_csv('sample2.csv')
     return df
 
-def delete_dates(inputString):
-    to_return = ""
-    unwanted_digits = ["1", "2", "3", "4", "5", "6", "7", "8", "9", "0", "/"]
-    for char in inputString:
-        if (not (char in unwanted_digits)):
-            to_return += char
-    if (to_return == ""):
-        return "N/A"
-    return to_return
-
 def create_final_df(vaccine_card):
     # Gets form_df
     form_df = runFormAnalyzeTextract(s3BucketVaccineCards, vaccine_card)
     form_df.set_index('key_text', inplace=True)
-    
     fields = ['First Name','Last Name','Date of birth']
-    
     f_df = pd.DataFrame()
     for i in fields:
         if i in form_df.index:
@@ -305,11 +336,11 @@ def create_final_df(vaccine_card):
     t_df = pd.concat(frames)
     t_df = t_df.fillna(method='bfill')
     t_df = t_df[:-1]
-    
-    final_frames = [f_df, t_df]
-    final_df = pd.concat(final_frames)
 
     #final_df contains form AND table dfs
+    final_frames = [f_df, t_df]
+    final_df = pd.concat(final_frames)
+    # print(final_df)
     final_df = final_df.fillna(method='bfill')
     final_df = final_df[:-1]
     final_df = final_df.replace(np.nan, "N/A")
@@ -320,11 +351,22 @@ def create_final_df(vaccine_card):
     for col in final_df.columns:
         if col not in columns_required:
             final_df.drop(col,inplace = True, axis = 1)
+
+    # Make sure dose1_manufacturer and dose2_manufacturer don't contain dates (numbers or slashes)
+    final_df['dose1_manufacturer'] = delete_dates(final_df['dose1_manufacturer'])
+    final_df['dose2_manufacturer'] = delete_dates(final_df['dose2_manufacturer'])
     
-    #make sure dose1_manufacturer and dose2 doesn't contain dates (numbers or slashes)
-    final_df['dose1_manufacturer'] = delete_dates(final_df['dose1_manufacturer'][0])
-    final_df['dose2_manufacturer'] = delete_dates(final_df['dose2_manufacturer'][0])
-        
+    # Update dates array using format_as_date function 
+    # + Removes all special characters, spaces
+    # + Re-adds slashes starting from back of the date to achieve desired formatting
+    if (final_df['dose1_date'][0] is not None and final_df['dose2_date'][0] is not None):
+        updated_dates = format_as_date(final_df['dose1_date'][0], final_df['dose2_date'][0], final_df['Date of birth'][0])
+
+    # Replace the dates with their updated versions in final_df
+    final_df['dose1_date'][0] = updated_dates[0]
+    final_df['dose2_date'][0] = updated_dates[1]
+    final_df['Date of birth'][0] = updated_dates[2]
+
      # Flags vaccine card (True) if Vaccine card extraction contains any N/A values
     flagged_cols = []
     for i in range(len(final_df.columns)):
@@ -339,23 +381,22 @@ def create_final_df(vaccine_card):
 
 def run():
     # Run your vaccine card
-    final_df = create_final_df(vaccineCardFile)
+    # final_df = create_final_df("IMG_2925 (2).jpg")
 
     # Run entire bucket of vaccine cards
-    # s3 = boto3.resource('s3')
-    # my_bucket = s3.Bucket(s3BucketVaccineCards)
+    s3 = boto3.resource('s3')
+    my_bucket = s3.Bucket(s3BucketVaccineCards)
 
-    # final_df  = pd.DataFrame()
-    # for my_bucket_object in my_bucket.objects.all():
-    #     if (my_bucket_object.key != 'IMG_8541.jpg'):
-    #         final_df = final_df.append(create_final_df(my_bucket_object.key),ignore_index=True)
+    final_df  = pd.DataFrame()
+    for my_bucket_object in my_bucket.objects.all():
+        if (my_bucket_object.key != 'IMG_8541.jpg' and my_bucket_object.key != 'IMG_2708.jpg' and my_bucket_object.key != vaccineCardFile ):
+            final_df= final_df.append(create_final_df(my_bucket_object.key),ignore_index=True)
 
-    # pd.set_option("display.max_rows", None, "display.max_columns", None)
-    # final_df.to_csv("final_output.csv",index = False)
+    pd.set_option("display.max_rows", None, "display.max_columns", None)
+    final_df.to_csv("final_output.csv",index = False)
     
 
 run()
-
 
 
 
