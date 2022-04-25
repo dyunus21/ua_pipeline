@@ -402,10 +402,6 @@ def run():
             final_df = create_final_df(my_bucket_object.key)
 
 
-    # for item in scan_table(dynamodb_client, TableName="VaccineInputUS-a7zevy56jbg5vhz7otjz2zgu6i-staging"):
-    #     vaccine_card = item['User_Email']['S']+"-"+item['Form_Name']['S']
-    #     table_df = runTableAnalyzeTextract(s3BucketVaccineCards, vaccine_card)
-    #     print(vaccine_card)
     # Run your vaccine card
     # final_df = create_final_df(vaccineCardFile)
 
