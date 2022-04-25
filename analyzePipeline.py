@@ -6,7 +6,7 @@ from cv2 import dft
 import pandas as pd
 import numpy as np
 from trp import Document
-
+from boto3.dynamodb.conditions import Key
 
 import re
 import nltk
@@ -15,10 +15,40 @@ from nltk.util import ngrams
 
 s3 = boto3.client("s3")
 textract = boto3.client("textract")
+dynamodb = boto3.resource('dynamodb', region_name="us-east-1")
 
-s3BucketVaccineCards = "demovaccinecards123"  # REPLACE WITH S3 BUCKET NAME
-vaccineCardFile = "IMG_5027 (1).jpeg"             # REPLACE FOR CARD IN BUCKET
+TABLE_NAME = "VaccineInputUS"
+# Creating the DynamoDB Client
+dynamodb_client = boto3.client('dynamodb')
+# Creating the DynamoDB Table Resource
+table = dynamodb.Table(TABLE_NAME)
 
+s3BucketVaccineCards = "unitedairlineshealth-storage232654-staging"
+# s3BucketVaccineCards = "demovaccinecards2022"               # REPLACE WITH S3 BUCKET NAME
+vaccineCardFile = "Covid_Vaccine_Card_old.jpg"             # REPLACE FOR CARD IN BUCKET
+# # userEmail = 
+
+
+
+# Scans DynamoDB table to get user information
+# https://alexwlchan.net/2020/05/getting-every-item-from-a-dynamodb-table-with-python/
+def scan_table(dynamo_client, *, TableName, **kwargs):
+    """
+    Generates all the items in a DynamoDB table.
+
+    :param dynamo_client: A boto3 client for DynamoDB.
+    :param TableName: The name of the table to scan.
+
+    Other keyword arguments will be passed directly to the Scan operation.
+    See https://boto3.amazonaws.com/v1/documentation/api/latest/reference/services/dynamodb.html#DynamoDB.Client.scan
+
+    """
+    paginator = dynamo_client.get_paginator("scan")
+
+    for page in paginator.paginate(TableName=TableName, **kwargs):
+        yield from page["Items"]
+
+# Calls the textract service
 def start_analyze(s3BucketVaccineCards, vaccineCardFile, feature_type):
     doc_spec = {"S3Object": {"Bucket": s3BucketVaccineCards, "Name": vaccineCardFile}}
 
@@ -26,59 +56,6 @@ def start_analyze(s3BucketVaccineCards, vaccineCardFile, feature_type):
         DocumentLocation=doc_spec, FeatureTypes=[feature_type]
     )
     return response["JobId"]
-
-def delete_dates(inputString):
-    print(str(inputString))
-    to_return = ""
-    for char in inputString:
-        if (not char.isdigit()) or (not (char == "/")):
-            to_return += char
-    if (to_return == ""):
-        return "N/A"
-    return to_return
-
-def format_as_date(updated_dose1_date, updated_dose2_date, updated_dob_date):
-    # List of characters to remove (including space)
-    characters_to_remove = "~-_+=\{\}'\".,?\:;<>[]ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz!@#$%^&*()/ "
-    characters_to_remove = list(characters_to_remove)
-    # Delete characters (replace each char with "")
-    for character in characters_to_remove:
-        updated_dose1_date = updated_dose1_date.replace(character, "")
-        updated_dose2_date = updated_dose2_date.replace(character, "")
-        updated_dob_date = updated_dob_date.replace(character, "")
-    # Reverse the dates
-    updated_dose1_date=updated_dose1_date[len(updated_dose1_date)::-1]
-    updated_dose2_date=updated_dose2_date[len(updated_dose2_date)::-1]
-    updated_dob_date=updated_dob_date[len(updated_dob_date)::-1]
-    # Add a slash after every two characters
-    updated_dose1_date = '/'.join(updated_dose1_date[i:i + 2] for i in range(0, len(updated_dose1_date), 2))
-    updated_dose2_date = '/'.join(updated_dose2_date[i:i + 2] for i in range(0, len(updated_dose2_date), 2))
-    updated_dob_date = '/'.join(updated_dob_date[i:i + 2] for i in range(0, len(updated_dob_date), 2))
-    # Reverse the dates again
-    updated_dose1_date = updated_dose1_date[len(updated_dose1_date)::-1]
-    updated_dose2_date = updated_dose2_date[len(updated_dose2_date)::-1]
-    updated_dob_date = updated_dob_date[len(updated_dob_date)::-1]
-    # Account for mm/dd/yyyy format
-    if len(updated_dose1_date) >= 10:
-        extra_slash_index = updated_dose1_date.rfind("/")
-        updated_dose1_date = updated_dose1_date[:extra_slash_index] + updated_dose1_date[extra_slash_index+1:]
-    if len(updated_dose2_date) >= 10:
-        extra_slash_index = updated_dose2_date.rfind("/")
-        updated_dose2_date = updated_dose2_date[:extra_slash_index] + updated_dose2_date[extra_slash_index+1:]
-    if len(updated_dob_date) >= 10:
-        extra_slash_index = updated_dob_date.rfind("/")
-        updated_dob_date = updated_dob_date[:extra_slash_index] + updated_dob_date[extra_slash_index+1:]
-    # Account for m/d/yy format
-    if len(updated_dose1_date) <= 5 and len(updated_dose1_date) > 0:
-        updated_dose1_date = updated_dose1_date[:1] + "/" + updated_dose1_date[1:]
-    if len(updated_dose2_date) <= 5 and len(updated_dose2_date) > 0:
-        updated_dose2_date = updated_dose2_date[:1] + "/" + updated_dose2_date[1:]
-    if len(updated_dob_date) <= 5 and len(updated_dob_date) > 0:
-        updated_dob_date = updated_dob_date[:1] + "/" + updated_dob_date[1:]
-    # Add all the updated dates to an array and return
-    updated_dates = []
-    updated_dates.extend((updated_dose1_date, updated_dose2_date, updated_dob_date))
-    return updated_dates
 
 def CheckAnalyzeJobComplete(jobId):
     time.sleep(5)
@@ -92,6 +69,7 @@ def CheckAnalyzeJobComplete(jobId):
         print("Job status: {}".format(status))
     return status
 
+# Gets Textract results
 def get_textract_results(job_id):
     response = textract.get_document_analysis(JobId=job_id)
     pages = [response]
@@ -115,20 +93,15 @@ def get_textract_results(job_id):
 def get_textract_tables(job_id):
     response = textract.get_document_analysis(JobId=job_id)
     doc = Document(response)
-    #we want all the values in a row, separated by commas
-    #first name, last name, DOB, vaccine 1 (eg pfizer), vaccine 1 date, vaccine 1 location
-    # FIX LATER 
     for page in doc.pages:
         for table in page.tables:
             data = [[cell.text for cell in row.cells] for row in table.rows]
             df = pd.DataFrame(data)
-    
-    #print(df)
-    #df.to_csv('sample.csv')
+
     return df
 
+# Primary Table Extraction Function
 def runTableAnalyzeTextract(s3BucketVaccineCards, vaccineCardFile):
-
     textractJobId = start_analyze(s3BucketVaccineCards, vaccineCardFile, "TABLES")
     print("Started job with id: {}".format(textractJobId))
     
@@ -136,8 +109,6 @@ def runTableAnalyzeTextract(s3BucketVaccineCards, vaccineCardFile):
         df = get_textract_tables(textractJobId)
 
     return df
-
-#runTableAnalyzeTextract()
 
 ############################
       # FORM ANALYZE #
@@ -204,11 +175,9 @@ def get_form_dataframe(blocks):
 
     df = pd.DataFrame(results)
     df = df[df.value_text != '']
-    #df[["key_text", "key_confidence", "value_text", "value_confidence"]].head()
-    # print(df)
     return df
 
-
+# Primary Form Extraction 
 def runFormAnalyzeTextract(s3BucketVaccineCards, vaccineCardFile):
 
     textractJobId = start_analyze(s3BucketVaccineCards, vaccineCardFile, "FORMS")
@@ -221,15 +190,6 @@ def runFormAnalyzeTextract(s3BucketVaccineCards, vaccineCardFile):
 
     return get_form_dataframe(blocks)
     
-    
-
-    
-    
-    #print(pages[0])
-    #with open('test.json', 'w') as json_file:
-        #json.dump(pages[0], json_file)
-
-#runFormAnalyzeTextract()
 
 ############################
       # AUTOCORRECT #
@@ -263,6 +223,7 @@ def autocorrect(input, correct_words, view_tags=False):
         print(key, ': ', correct, dis)
     return key
 
+# Autocorrects table
 def correct_all_table(df):
     pd.set_option("display.max_rows", None, "display.max_columns", None)
     # print("table_df:")
@@ -283,12 +244,64 @@ def correct_all_table(df):
                 if "moderna" in df.iat[row,col].lower():
                     df.iat[row,col] = "vaccine$ moderna"
                 df.iat[row,col] = autocorrect(df.iat[row,col], correct_words, False)
-                
-
-    #print(df)
-    #df.to_csv('sample2.csv')
     return df
 
+# Deletes unnecessary chars
+def delete_dates(inputString):
+    to_return = ""
+    unwanted_digits = ["1", "2", "3", "4", "5", "6", "7", "8", "9", "0", "/"]
+    for char in inputString:
+        if (not (char in unwanted_digits)):
+            to_return += char
+    if (to_return == ""):
+        return "N/A"
+    return to_return
+
+
+def format_as_date(updated_dose1_date, updated_dose2_date, updated_dob_date):
+    # List of characters to remove (including space)
+    characters_to_remove = "~-_+=\{\}'\".,?\:;<>[]ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz!@#$%^&*()/ "
+    characters_to_remove = list(characters_to_remove)
+    # Delete characters (replace each char with "")
+    for character in characters_to_remove:
+        updated_dose1_date = updated_dose1_date.replace(character, "")
+        updated_dose2_date = updated_dose2_date.replace(character, "")
+        updated_dob_date = updated_dob_date.replace(character, "")
+    # Reverse the dates
+    updated_dose1_date=updated_dose1_date[len(updated_dose1_date)::-1]
+    updated_dose2_date=updated_dose2_date[len(updated_dose2_date)::-1]
+    updated_dob_date=updated_dob_date[len(updated_dob_date)::-1]
+    # Add a slash after every two characters
+    updated_dose1_date = '/'.join(updated_dose1_date[i:i + 2] for i in range(0, len(updated_dose1_date), 2))
+    updated_dose2_date = '/'.join(updated_dose2_date[i:i + 2] for i in range(0, len(updated_dose2_date), 2))
+    updated_dob_date = '/'.join(updated_dob_date[i:i + 2] for i in range(0, len(updated_dob_date), 2))
+    # Reverse the dates again
+    updated_dose1_date = updated_dose1_date[len(updated_dose1_date)::-1]
+    updated_dose2_date = updated_dose2_date[len(updated_dose2_date)::-1]
+    updated_dob_date = updated_dob_date[len(updated_dob_date)::-1]
+    # Account for mm/dd/yyyy format
+    if len(updated_dose1_date) >= 10:
+        extra_slash_index = updated_dose1_date.rfind("/")
+        updated_dose1_date = updated_dose1_date[:extra_slash_index] + updated_dose1_date[extra_slash_index+1:]
+    if len(updated_dose2_date) >= 10:
+        extra_slash_index = updated_dose2_date.rfind("/")
+        updated_dose2_date = updated_dose2_date[:extra_slash_index] + updated_dose2_date[extra_slash_index+1:]
+    if len(updated_dob_date) >= 10:
+        extra_slash_index = updated_dob_date.rfind("/")
+        updated_dob_date = updated_dob_date[:extra_slash_index] + updated_dob_date[extra_slash_index+1:]
+    # Account for m/d/yy format
+    if len(updated_dose1_date) <= 5 and len(updated_dose1_date) > 0:
+        updated_dose1_date = updated_dose1_date[:1] + "/" + updated_dose1_date[1:]
+    if len(updated_dose2_date) <= 5 and len(updated_dose2_date) > 0:
+        updated_dose2_date = updated_dose2_date[:1] + "/" + updated_dose2_date[1:]
+    if len(updated_dob_date) <= 5 and len(updated_dob_date) > 0:
+        updated_dob_date = updated_dob_date[:1] + "/" + updated_dob_date[1:]
+    # Add all the updated dates to an array and return
+    updated_dates = []
+    updated_dates.extend((updated_dose1_date, updated_dose2_date, updated_dob_date))
+    return updated_dates
+
+# Creates final_df, merging form and table extraction along with autocorrection and flagging 
 def create_final_df(vaccine_card):
     # Gets form_df
     form_df = runFormAnalyzeTextract(s3BucketVaccineCards, vaccine_card)
@@ -380,20 +393,33 @@ def create_final_df(vaccine_card):
     return final_df
 
 def run():
-    # Run your vaccine card
-    # final_df = create_final_df("IMG_2925 (2).jpg")
-
-    # Run entire bucket of vaccine cards
+    # Gets image from s3Bucket based on user_email extracted from Dynamodb table and extracts vaccine card information
     s3 = boto3.resource('s3')
     my_bucket = s3.Bucket(s3BucketVaccineCards)
+    for my_bucket_object in my_bucket.objects.filter(Prefix="public/VaccineInputUS/"):
+        print(my_bucket_object.key)
+        if(my_bucket_object.key == "public/VaccineInputUS/thekritimathur@gmail.com-VaccineInputUS"):
+            final_df = create_final_df(my_bucket_object.key)
 
-    final_df  = pd.DataFrame()
-    for my_bucket_object in my_bucket.objects.all():
-        if (my_bucket_object.key != 'IMG_8541.jpg' and my_bucket_object.key != 'IMG_2708.jpg' and my_bucket_object.key != vaccineCardFile ):
-            final_df= final_df.append(create_final_df(my_bucket_object.key),ignore_index=True)
 
-    pd.set_option("display.max_rows", None, "display.max_columns", None)
-    final_df.to_csv("final_output.csv",index = False)
+    # for item in scan_table(dynamodb_client, TableName="VaccineInputUS-a7zevy56jbg5vhz7otjz2zgu6i-staging"):
+    #     vaccine_card = item['User_Email']['S']+"-"+item['Form_Name']['S']
+    #     table_df = runTableAnalyzeTextract(s3BucketVaccineCards, vaccine_card)
+    #     print(vaccine_card)
+    # Run your vaccine card
+    # final_df = create_final_df(vaccineCardFile)
+
+    # Run entire bucket of vaccine cards
+    # s3 = boto3.resource('s3')
+    # my_bucket = s3.Bucket(s3BucketVaccineCards)
+
+    # final_df  = pd.DataFrame()
+    # for my_bucket_object in my_bucket.objects.all():
+    #     if (my_bucket_object.key != 'IMG_8541.jpg' and my_bucket_object.key != 'IMG_2708.jpg' and my_bucket_object.key != vaccineCardFile ):
+    #         final_df= final_df.append(create_final_df(my_bucket_object.key),ignore_index=True)
+
+    # pd.set_option("display.max_rows", None, "display.max_columns", None)
+    # final_df.to_csv("final_output.csv",index = False)
     
 
 run()
