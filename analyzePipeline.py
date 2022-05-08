@@ -5,6 +5,7 @@ import json
 from cv2 import dft
 import pandas as pd
 import numpy as np
+from sqlalchemy import true
 from trp import Document
 from boto3.dynamodb.conditions import Key
 
@@ -16,17 +17,19 @@ from nltk.util import ngrams
 s3 = boto3.client("s3")
 textract = boto3.client("textract")
 dynamodb = boto3.resource('dynamodb', region_name="us-east-1")
+rekognition  = boto3.client('rekognition')
 
-TABLE_NAME = "VaccineInputUS"
+
+TABLE_NAME = "VaccineInputUS-a7zevy56jbg5vhz7otjz2zgu6i-staging"
 # Creating the DynamoDB Client
-dynamodb_client = boto3.client('dynamodb')
+dynamoDb_client = boto3.client('dynamodb')
 # Creating the DynamoDB Table Resource
-table = dynamodb.Table(TABLE_NAME)
-
+input_table = dynamodb.Table(TABLE_NAME)
+output_table = dynamodb.Table("VaccineOutputUS-a7zevy56jbg5vhz7otjz2zgu6i-staging")
 s3BucketVaccineCards = "unitedairlineshealth-storage232654-staging"
 # s3BucketVaccineCards = "demovaccinecards2022"               # REPLACE WITH S3 BUCKET NAME
-vaccineCardFile = "Covid_Vaccine_Card_old.jpg"             # REPLACE FOR CARD IN BUCKET
-# # userEmail = 
+# vaccineCardFile = "Covid_Vaccine_Card_old.jpg"             # REPLACE FOR CARD IN BUCKET
+
 
 
 
@@ -301,6 +304,20 @@ def format_as_date(updated_dose1_date, updated_dose2_date, updated_dob_date):
     updated_dates.extend((updated_dose1_date, updated_dose2_date, updated_dob_date))
     return updated_dates
 
+def validateCard(fileName):
+    response = rekognition.detect_labels(
+        Image={
+            'Bytes' : b'bytes',
+            'S3Object': {
+                'Bucket': s3BucketVaccineCards,
+                'Name': fileName,
+            }
+        },
+        MaxLabels=2,
+        MinConfidence=80
+    )
+
+################### FINAL DF ############################
 # Creates final_df, merging form and table extraction along with autocorrection and flagging 
 def create_final_df(vaccine_card):
     # Gets form_df
@@ -356,9 +373,7 @@ def create_final_df(vaccine_card):
     # print(final_df)
     final_df = final_df.fillna(method='bfill')
     final_df = final_df[:-1]
-    final_df = final_df.replace(np.nan, "N/A")
-    final_df = final_df.replace('', "N/A")
-
+    
     # Removes any unnecessary columns
     columns_required = ["First Name","Last Name", "Date of birth","dose1_date","dose1_manufacturer","dose1_location","dose2_date","dose2_manufacturer","dose2_location","Flag"]
     for col in final_df.columns:
@@ -380,6 +395,10 @@ def create_final_df(vaccine_card):
     final_df['dose2_date'][0] = updated_dates[1]
     final_df['Date of birth'][0] = updated_dates[2]
 
+    final_df = final_df.replace(np.nan, "N/A")
+    final_df = final_df.replace('', "N/A")
+
+
      # Flags vaccine card (True) if Vaccine card extraction contains any N/A values
     flagged_cols = []
     for i in range(len(final_df.columns)):
@@ -392,16 +411,57 @@ def create_final_df(vaccine_card):
     print(final_df)
     return final_df
 
+# def checkImageInBucket(imageName, s3bucket):
+#     for object in s3bucket.objects.filter(Prefix="public/VaccineInputUS/"):
+#         if object.key == imageName:
+#             return True
+#     return False
+
+# Adds a users output to table
+def addOutputToTable(output,user):
+    output_table.put_item(
+        Item = {
+            'id': user['id']['S'],
+            'User_Email': user['User_Email']['S'],
+            'Form_Name': user['Form_Name']['S'],
+            'First_Name': output['First Name'][0],
+            'Last_Name': output['Last Name'][0],
+            'Date_of_Birth': output['Date of birth'][0],
+            'Dose1_Manufacturer': output['dose1_manufacturer'][0],
+            'Dose1_Date': output['dose1_date'][0],
+            'Dose1_Location': output['dose1_location'][0],
+            'Dose2_Manufacturer': output['dose2_manufacturer'][0],
+            'Dose2_Date': output['dose2_date'][0],
+            'Dose2_Location': output['dose2_location'][0],
+            'Flag': output['Flag'][0]
+        }
+    )
+
+
 def run():
-    # Gets image from s3Bucket based on user_email extracted from Dynamodb table and extracts vaccine card information
-    s3 = boto3.resource('s3')
-    my_bucket = s3.Bucket(s3BucketVaccineCards)
-    for my_bucket_object in my_bucket.objects.filter(Prefix="public/VaccineInputUS/"):
-        print(my_bucket_object.key)
-        if(my_bucket_object.key == "public/VaccineInputUS/thekritimathur@gmail.com-VaccineInputUS"):
-            final_df = create_final_df(my_bucket_object.key)
+    # s3 = boto3.resource('s3')
+    # inputBucket = s3.Bucket(s3BucketVaccineCards)
+    # final_df = pd.DataFrame()
+    
+    for item in scan_table(dynamo_client = dynamoDb_client, TableName = TABLE_NAME):
+        image = "public/VaccineInputUS/"+item['Image_Name']['S']
+        print(item['id']['S']," ", item['Image_Name']['S']," ", item['Form_Name']['S'])
+      
+        if item['Image_Name']['S'] ==  "thekritimathur@gmail.com-VaccineInputUS":
+            df = create_final_df(image)
+            addOutputToTable(df,item)
 
+    # CHECKING OUTPUT TABLE
+    for item in scan_table(dynamo_client = dynamoDb_client, TableName = "VaccineOutputUS-a7zevy56jbg5vhz7otjz2zgu6i-staging"):
+         print(item['id']['S']," ", item['Form_Name']['S']," ",item['First_Name']['S']," ",item["Last_Name"]['S'])
 
+        
+    
+
+    
+    
+
+###### OLD CODE #######
     # Run your vaccine card
     # final_df = create_final_df(vaccineCardFile)
 
