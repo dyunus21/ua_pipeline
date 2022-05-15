@@ -14,6 +14,8 @@ import nltk
 from nltk.metrics.distance import jaccard_distance
 from nltk.util import ngrams
 
+from decimal import Decimal
+
 s3 = boto3.client("s3")
 textract = boto3.client("textract")
 dynamodb = boto3.resource('dynamodb', region_name="us-east-1")
@@ -168,10 +170,10 @@ def get_form_dataframe(blocks):
         result = {
             #"key_id": k,
             "key_text": key_text,
-            #"key_confidence": blocks[k]["Confidence"],
+            "key_confidence": blocks[k]["Confidence"],
             #"value_id": v,
             "value_text": value_text,
-            #"value_confidence": blocks[v]["Confidence"],
+            # "value_confidence": blocks[v]["Confidence"],
         }
 
         results.append(result)
@@ -325,11 +327,14 @@ def create_final_df(vaccine_card):
     form_df.set_index('key_text', inplace=True)
     fields = ['First Name','Last Name','Date of birth']
     f_df = pd.DataFrame()
-    for i in fields:
-        if i in form_df.index:
-            f_df[i] = form_df.loc[i]
+    conf = 0
+    for i in range(len(fields)):
+        if fields[i] in form_df.index:
+            f_df[fields[i]] =(form_df.iloc[i].loc['value_text']).split(',') 
+
+            conf+= int((form_df.iloc[i].loc['key_confidence']))
         else:   # Replaces any missing values with N/A
-            f_df[i] = 'N/A'
+            f_df[fields[i]] = 'N/A'
 
     # Gets table_df
     table_df = runTableAnalyzeTextract(s3BucketVaccineCards, vaccine_card)
@@ -406,9 +411,12 @@ def create_final_df(vaccine_card):
             flagged_cols.append(i)
     final_df["Flag"] = str(flagged_cols)[1:-1]
 
+    ##### Computes confidence level as average of confidence levels of fields in form df
+    final_df["Confidence Level"] = conf/len(fields)
+
 
     pd.set_option("display.max_rows", None, "display.max_columns", None)
-    print(final_df)
+    # print(final_df)
     return final_df
 
 # def checkImageInBucket(imageName, s3bucket):
@@ -433,7 +441,8 @@ def addOutputToTable(output,user):
             'Dose2_Manufacturer': output['dose2_manufacturer'][0],
             'Dose2_Date': output['dose2_date'][0],
             'Dose2_Location': output['dose2_location'][0],
-            'Flag': output['Flag'][0]
+            'Flag': output['Flag'][0],
+            'Confidence_Level' : Decimal(output['Confidence Level'][0])
         }
     )
 
@@ -449,11 +458,13 @@ def run():
       
         if item['Image_Name']['S'] ==  "thekritimathur@gmail.com-VaccineInputUS":
             df = create_final_df(image)
+            print(df)
             addOutputToTable(df,item)
 
     # CHECKING OUTPUT TABLE
     for item in scan_table(dynamo_client = dynamoDb_client, TableName = "VaccineOutputUS-a7zevy56jbg5vhz7otjz2zgu6i-staging"):
-         print(item['id']['S']," ", item['Form_Name']['S']," ",item['First_Name']['S']," ",item["Last_Name"]['S'])
+        # print(item)
+        print(item['id']['S']," ", item['Form_Name']['S']," ",item['First_Name']['S']," ",item["Last_Name"]['S'],item['Confidence_Level']['N'])
 
         
     
