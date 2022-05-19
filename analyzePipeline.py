@@ -179,6 +179,8 @@ def get_form_dataframe(blocks):
         results.append(result)
 
     df = pd.DataFrame(results)
+    if len(df)== 0:
+        return df
     df = df[df.value_text != '']
     return df
 
@@ -324,6 +326,12 @@ def validateCard(fileName):
 def create_final_df(vaccine_card):
     # Gets form_df
     form_df = runFormAnalyzeTextract(s3BucketVaccineCards, vaccine_card)
+    
+    # form_df is empty --> card is not valid
+    if(len(form_df)==0):
+        print("Image is not valid!")
+        return form_df
+
     form_df.set_index('key_text', inplace=True)
     fields = ['First Name','Last Name','Date of birth']
     f_df = pd.DataFrame()
@@ -338,6 +346,7 @@ def create_final_df(vaccine_card):
 
     # Gets table_df
     table_df = runTableAnalyzeTextract(s3BucketVaccineCards, vaccine_card)
+    print("table_df",table_df)
     corrected_df = correct_all_table(table_df)
 
     # Makes sure that first row has the headers we are looking for 
@@ -363,10 +372,7 @@ def create_final_df(vaccine_card):
 
     dose1_df = dose1_df.rename(columns={'Manufacturer Header': 'dose1_manufacturer', 'Date Header': 'dose1_date', 'Site Header': 'dose1_location' })
     dose2_df = dose2_df.rename(columns={'Manufacturer Header': 'dose2_manufacturer', 'Date Header': 'dose2_date', 'Site Header': 'dose2_location' })
-    # print("Dose1 df")
-    # print(dose1_df)
-    # print("Dose2 df")
-    # print(dose2_df)
+ 
     frames = [dose1_df, dose2_df]
     t_df = pd.concat(frames)
     t_df = t_df.fillna(method='bfill')
@@ -416,7 +422,7 @@ def create_final_df(vaccine_card):
 
 
     pd.set_option("display.max_rows", None, "display.max_columns", None)
-    # print(final_df)
+    print(final_df)
     return final_df
 
 # def checkImageInBucket(imageName, s3bucket):
@@ -442,37 +448,32 @@ def addOutputToTable(output,user):
             'Dose2_Date': output['dose2_date'][0],
             'Dose2_Location': output['dose2_location'][0],
             'Flag': output['Flag'][0],
-            'Confidence_Level' : Decimal(output['Confidence Level'][0])
+            'Confidence_Level' : Decimal(str(output['Confidence Level'][0]))
         }
     )
 
 
 def run():
-    # s3 = boto3.resource('s3')
-    # inputBucket = s3.Bucket(s3BucketVaccineCards)
-    # final_df = pd.DataFrame()
-    
+    print("Input Table")
     for item in scan_table(dynamo_client = dynamoDb_client, TableName = TABLE_NAME):
         image = "public/VaccineInputUS/"+item['Image_Name']['S']
         print(item['id']['S']," ", item['Image_Name']['S']," ", item['Form_Name']['S'])
-      
-        if item['Image_Name']['S'] ==  "thekritimathur@gmail.com-VaccineInputUS":
-            df = create_final_df(image)
-            print(df)
+        df = create_final_df(image) 
+        # if valid image, add to output table
+        if(len(df)!=0):
             addOutputToTable(df,item)
 
     # CHECKING OUTPUT TABLE
+    print("\nOutput Table")
     for item in scan_table(dynamo_client = dynamoDb_client, TableName = "VaccineOutputUS-a7zevy56jbg5vhz7otjz2zgu6i-staging"):
         # print(item)
-        print(item['id']['S']," ", item['Form_Name']['S']," ",item['First_Name']['S']," ",item["Last_Name"]['S'],item['Confidence_Level']['N'])
+        print(item['id']['S']," ", item['Form_Name']['S']," ",item['First_Name']['S']," ",item["Last_Name"]['S']," ", item["Last_Name"]['S'], item['Confidence_Level']['N'])
 
-        
-    
 
-    
-    
+
 
 ###### OLD CODE #######
+
     # Run your vaccine card
     # final_df = create_final_df(vaccineCardFile)
 
